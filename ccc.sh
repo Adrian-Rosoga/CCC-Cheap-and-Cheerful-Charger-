@@ -1,0 +1,1 @@
+cd /home/adi/bin && /bin/python3 /home/adi/bin/ccc.py
