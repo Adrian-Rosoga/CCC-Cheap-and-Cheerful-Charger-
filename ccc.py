@@ -79,7 +79,7 @@ def beep(frequency=2500, durationMsec=1000):
         winsound.Beep(frequency, durationMsec)
     else:
         mixer.init()
-        alert = mixer.Sound('beep-03.wav')
+        alert = mixer.Sound('beep-low-freq.wav')
         alert.play()
         time.sleep(1)
         mixer.quit()
