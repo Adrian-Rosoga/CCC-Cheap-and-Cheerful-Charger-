@@ -29,6 +29,8 @@ from pygame import mixer
 from socket import timeout
 from urllib.error import URLError, HTTPError
 from abc import ABC, abstractmethod
+from contextlib import contextmanager
+
 
 IS_WINDOWS = False
 
@@ -61,6 +63,21 @@ OFF = False
 TIMEOUT = 10
 
 
+@contextmanager
+def beeper(soundfile='beep-low-freq.wav', duration_secs=1):
+
+    # Acquire
+    mixer.init()
+    alert = mixer.Sound(soundfile)
+    alert.play()
+    time.sleep(duration_secs)
+    try:
+        yield alert
+    finally:
+        # Release
+        mixer.quit()
+
+
 def should_be_quiet():
 
     p = subprocess.Popen(['iwgetid'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -78,11 +95,8 @@ def beep(frequency=2500, durationMsec=1000):
         import winsound
         winsound.Beep(frequency, durationMsec)
     else:
-        mixer.init()
-        alert = mixer.Sound('beep-low-freq.wav')
-        alert.play()
-        time.sleep(1)
-        mixer.quit()
+        with beeper() as b:
+            pass
 
 
 class Relay(ABC):
