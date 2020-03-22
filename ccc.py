@@ -11,9 +11,8 @@ TODO
     # Ensure only one instance could run
 '''
 
-import psutil
+
 import time
-import datetime
 import os
 import subprocess
 import sys
@@ -25,11 +24,12 @@ import signal
 import logging
 import argparse
 import traceback
-from pygame import mixer
 from socket import timeout
 from urllib.error import URLError, HTTPError
 from abc import ABC, abstractmethod
-from contextlib import contextmanager, AbstractContextManager
+from contextlib import AbstractContextManager
+import psutil
+from pygame import mixer
 
 
 IS_WINDOWS = False
@@ -65,10 +65,6 @@ TIMEOUT = 10
 
 class Beeper(AbstractContextManager):
 
-    def __init__(self, soundfile='beep-low-freq.wav', duration_secs=1):
-        self.soundfile = soundfile
-        self.duration_secs = duration_secs
-
     def __enter__(self):
         mixer.init()
         return self
@@ -76,10 +72,10 @@ class Beeper(AbstractContextManager):
     def __exit__(self, exc_type, exc_value, traceback):
         mixer.quit()
 
-    def beep(self):
-        alert = mixer.Sound(self.soundfile)
-        alert.play()
-        time.sleep(self.duration_secs)
+    @staticmethod
+    def beep(soundfile='beep-low-freq.wav', duration_secs=1):
+        mixer.Sound(soundfile).play()
+        time.sleep(duration_secs)
 
 
 def should_be_quiet():
@@ -390,7 +386,7 @@ class WatchdogThread(threading.Thread):
             time.sleep(60)
 
 
-if __name__ == "__main__":
+def main():
 
     logging.basicConfig(format="%(asctime)-15s - %(message)s",
                         datefmt='%Y-%m-%d %H:%M:%S',
@@ -423,3 +419,7 @@ if __name__ == "__main__":
 
     if False:
         listen_for_sleep()
+
+if __name__ == "__main__":
+
+    main()
