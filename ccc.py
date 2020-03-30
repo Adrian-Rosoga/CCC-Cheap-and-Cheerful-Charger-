@@ -68,7 +68,7 @@ class Beeper(AbstractContextManager):
     def __enter__(self):
         mixer.init()
         return self
-    
+
     def __exit__(self, exc_type, exc_value, traceback):
         mixer.quit()
 
@@ -80,8 +80,8 @@ class Beeper(AbstractContextManager):
 
 def should_be_quiet():
 
-    p = subprocess.Popen(['iwgetid'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    output, _ = p.communicate()
+    popen = subprocess.Popen(['iwgetid'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    output, _ = popen.communicate()
     # print(output)
     return 'Barclays' in output.decode()
 
@@ -116,9 +116,8 @@ class HIDRelay(Relay):
     @property
     def state(self) -> str:
 
-        p = subprocess.Popen(['hidusb-relay-cmd.exe', 'state'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        output, errors = p.communicate()
-        (errors)
+        popen = subprocess.Popen(['hidusb-relay-cmd.exe', 'state'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        output, _ = popen.communicate()
         if 'R1=ON' in output.decode("utf-8"):
             return 'ON'
         elif 'R1=OFF' in output.decode("utf-8"):
@@ -239,7 +238,7 @@ def control():
         relay.turn_power(ON)
 
     elif battery_percent() >= MAX_CHARGE:
-        
+
         if relay.state != 'OFF' or relay.state == 'N/A':
             relay.turn_power(OFF)
             logging.info(f'\t{battery_percent():.1f}% - Turn power OFF')
@@ -393,7 +392,6 @@ def main():
                         level=logging.INFO)
 
     parser = argparse.ArgumentParser(description='CCC (Cheap and Cheerful Charger)')
-    #parser.add_argument('tmp', help='Capture in /tmp/timelapse')
     args = parser.parse_args()
 
     logging.info('\n=== Cheap and Cheerful Charger ===\n')
@@ -419,6 +417,7 @@ def main():
 
     if False:
         listen_for_sleep()
+
 
 if __name__ == "__main__":
 
