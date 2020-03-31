@@ -87,14 +87,16 @@ def wifi_ssid() -> str:
         popen = subprocess.Popen(['netsh', 'wlan', 'show', 'interfaces'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         output, _ = popen.communicate()
         
-    # print(output)
-    return output_decode()  
+    print(output.decode())
+    return output.decode()  
 
 
 def should_be_quiet() -> bool:
     """At work keep it quiet"""
     
-    return 'Barclays' in wifi_ssid()
+    #return 'Barclays' in wifi_ssid()
+    wifi_ssid()
+    return False
 
 
 def beep(frequency=2500, duration_msec=1000):
@@ -384,12 +386,13 @@ class WatchdogThread(threading.Thread):
         while True:
 
             if battery_percent() >= MAX_ALERT_CHARGE:
-                logging.info(f'\t### Overcharged above {MAX_ALERT_CHARGE:.1f}% - {battery_percent:1.f}%')
+                logging.info(f'\t### Overcharged above {MAX_ALERT_CHARGE:.1f}% - {battery_percent():1.f}%')
                 if relay.state == 'ON':
                     beep(500, 3000)
 
             if battery_percent() <= MIN_ALERT_CHARGE:
-                logging.info(f'\t### Undercharged below {MIN_ALERT_CHARGE:.1f}% - {battery_percent:.1f}%')
+                logging.info(f'\t### Undercharged below {MIN_ALERT_CHARGE:.1f}% - {battery_percent():.1f}%')
+                
                 if relay.state == 'OFF':
                     beep(500, 3000)
 
