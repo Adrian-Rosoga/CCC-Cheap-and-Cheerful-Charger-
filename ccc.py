@@ -24,6 +24,7 @@ import signal
 import logging
 import argparse
 import traceback
+import platform
 from socket import timeout
 from urllib.error import URLError, HTTPError
 from abc import ABC, abstractmethod
@@ -32,18 +33,16 @@ import psutil
 from pygame import mixer
 
 
-IS_WINDOWS = False
+IS_WINDOWS = platform.system() == 'Windows'
 
-try:
+
+if IS_WINDOWS:
     import win32con
     import win32api
     import win32gui
     import win32event
     from winerror import ERROR_ALREADY_EXISTS
-except ImportError:
-    IS_WINDOWS = False
-else:
-    IS_WINDOWS = True
+
 
 #LOG_FILE = 'C:\\Tmp\\ccc.log'
 LOG_FILE = 'ccc.log'
@@ -78,12 +77,24 @@ class Beeper(AbstractContextManager):
         time.sleep(duration_secs)
 
 
-def should_be_quiet():
+def wifi_ssid() -> str:
+    """Return the wifi ssid or empty string if not connected to wifi"""
 
-    popen = subprocess.Popen(['iwgetid'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    output, _ = popen.communicate()
+    if not IS_WINDOWS:
+        popen = subprocess.Popen(['iwgetid'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        output, _ = popen.communicate()
+    else:
+        popen = subprocess.Popen(['netsh', 'wlan', 'show', 'interfaces'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        output, _ = popen.communicate()
+        
     # print(output)
-    return 'Barclays' in output.decode()
+    return output_decode()  
+
+
+def should_be_quiet() -> bool:
+    """At work keep it quiet"""
+    
+    return 'Barclays' in wifi_ssid()
 
 
 def beep(frequency=2500, duration_msec=1000):
@@ -403,6 +414,8 @@ def main():
     sys.stderr = sys.stdout
 
     if IS_WINDOWS:
+    
+        print("Checking if another instance is running...")
 
         mutex = win32event.CreateMutex(None, False, 'ccc')
         last_error = win32api.GetLastError()
