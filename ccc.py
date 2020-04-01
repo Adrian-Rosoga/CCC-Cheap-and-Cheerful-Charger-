@@ -27,6 +27,7 @@ import signal
 import logging
 import argparse
 import traceback
+import platform
 from socket import timeout
 from urllib.error import URLError, HTTPError
 from abc import ABC, abstractmethod
@@ -35,19 +36,16 @@ import psutil
 from pygame import mixer
 
 
-IS_WINDOWS = False
+IS_WINDOWS = platform.system() == 'Windows'
 
-try:
+
+if IS_WINDOWS:
     import winsound
     import win32con
     import win32api
     import win32gui
     import win32event
     from winerror import ERROR_ALREADY_EXISTS
-except ImportError:
-    IS_WINDOWS = False
-else:
-    IS_WINDOWS = True
 
 #LOG_FILE = 'C:\\Tmp\\ccc.log'
 LOG_FILE = 'ccc.log'
@@ -55,9 +53,7 @@ LOG_FILE = 'ccc.log'
 MIN_CHARGE, MAX_CHARGE = 35, 65
 #MIN_CHARGE, MAX_CHARGE = 45, 55
 #MIN_CHARGE, MAX_CHARGE = 49, 51
-#MIN_CHARGE, MAX_CHARGE = 58, 60
-
-#MIN_CHARGE_MANUAL, MAX_CHARGE_MANUAL = 40, 60
+ANUAL = 40, 60
 MIN_CHARGE_MANUAL, MAX_CHARGE_MANUAL = MIN_CHARGE - 1, MAX_CHARGE + 1
 MAX_ALERT_CHARGE = MAX_CHARGE + 5
 MIN_ALERT_CHARGE = MIN_CHARGE - 5
@@ -82,12 +78,26 @@ class Beeper(AbstractContextManager):
         time.sleep(duration_secs)
 
 
-def should_be_quiet():
+def wifi_ssid() -> str:
+    """Return the wifi ssid or empty string if not connected to wifi"""
 
-    popen = subprocess.Popen(['iwgetid'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    output, _ = popen.communicate()
-    # print(output)
-    return 'Barclays' in output.decode()
+    if not IS_WINDOWS:
+        popen = subprocess.Popen(['iwgetid'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        output, _ = popen.communicate()
+    else:
+        popen = subprocess.Popen(['netsh', 'wlan', 'show', 'interfaces'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        output, _ = popen.communicate()
+        
+    print(output.decode())
+    return output.decode()  
+
+
+def should_be_quiet() -> bool:
+    """At work keep it quiet"""
+    
+    #return 'Barclays' in wifi_ssid()
+    wifi_ssid()
+    return False
 
 
 def beep(frequency=2500, duration_msec=1000):
@@ -376,12 +386,13 @@ class WatchdogThread(threading.Thread):
         while True:
 
             if battery_percent() >= MAX_ALERT_CHARGE:
-                logging.info(f'\t### Overcharged above {MAX_ALERT_CHARGE:.1f}% - {battery_percent:1.f}%')
+                logging.info(f'\t### Overcharged above {MAX_ALERT_CHARGE:.1f}% - {battery_percent():1.f}%')
                 if relay.state == 'ON':
                     beep(500, 3000)
 
             if battery_percent() <= MIN_ALERT_CHARGE:
-                logging.info(f'\t### Undercharged below {MIN_ALERT_CHARGE:.1f}% - {battery_percent:.1f}%')
+                logging.info(f'\t### Undercharged below {MIN_ALERT_CHARGE:.1f}% - {battery_percent():.1f}%')
+                
                 if relay.state == 'OFF':
                     beep(500, 3000)
 
@@ -406,6 +417,8 @@ def main():
     sys.stderr = sys.stdout
 
     if IS_WINDOWS:
+    
+        print("Checking if another instance is running...")
 
         mutex = win32event.CreateMutex(None, False, 'ccc')
         last_error = win32api.GetLastError()
