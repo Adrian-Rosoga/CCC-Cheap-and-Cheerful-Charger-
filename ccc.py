@@ -9,6 +9,9 @@ v2 - 31 Dec 2019
 
 TODO
     # Ensure only one instance could run
+    # run() instead of popen()
+    # requests instead of urllib
+    # 
 '''
 
 
@@ -35,6 +38,7 @@ from pygame import mixer
 IS_WINDOWS = False
 
 try:
+    import winsound
     import win32con
     import win32api
     import win32gui
@@ -92,7 +96,6 @@ def beep(frequency=2500, duration_msec=1000):
         return
 
     if IS_WINDOWS:
-        import winsound
         winsound.Beep(frequency, duration_msec)
     else:
         with Beeper() as beeper:
