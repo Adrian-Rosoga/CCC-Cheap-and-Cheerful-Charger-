@@ -335,7 +335,7 @@ def listen_for_sleep():
     if hwnd is None:
         logging.info("hwnd is none!")
     else:
-        #logging.info("hwnd=%s" % hwnd)
+        logging.info("hwnd=%s" % hwnd)
         pass
 
     while True:
@@ -399,7 +399,32 @@ class WatchdogThread(threading.Thread):
             time.sleep(60)
 
 
+class SingleInstanceThread(threading.Thread):
+
+    def __init__(self):
+
+        threading.Thread.__init__(self)
+
+    def run(self):
+
+        if IS_WINDOWS:
+
+            print("Checking if another instance is running...")
+
+            mutex = win32event.CreateMutex(None, False, 'ccc')
+            last_error = win32api.GetLastError()
+
+            if last_error == ERROR_ALREADY_EXISTS:
+                print('Another instance already running. Exiting.')
+                os._exit(1)
+
+            while True:
+                time.sleep(10000)
+
+
 def main():
+
+    
 
     logging.basicConfig(format="%(asctime)-15s - %(message)s",
                         datefmt='%Y-%m-%d %H:%M:%S',
@@ -408,31 +433,24 @@ def main():
     parser = argparse.ArgumentParser(description='CCC (Cheap and Cheerful Charger)')
     args = parser.parse_args()
 
-    logging.info('\n=== Cheap and Cheerful Charger ===\n')
+    print('\n=== Cheap and Cheerful Charger ===\n')
+
+    sys.stderr = sys.stdout
 
     if not IS_WINDOWS:
         atexit.register(turn_power_off)
         signal.signal(signal.SIGUSR1, handler)
 
-    sys.stderr = sys.stdout
-
-    if IS_WINDOWS:
-    
-        print("Checking if another instance is running...")
-
-        mutex = win32event.CreateMutex(None, False, 'ccc')
-        last_error = win32api.GetLastError()
-
-        if last_error == ERROR_ALREADY_EXISTS:
-            print('Another instance already running. Exiting.')
-            sys.exit(1)
+    SingleInstanceThread().start()
 
     PowerControlThread().start()
 
     WatchdogThread().start()
 
-    if False:
+    if False and IS_WINDOWS:
         listen_for_sleep()
+
+    print("Main thread terminated.")
 
 
 if __name__ == "__main__":
