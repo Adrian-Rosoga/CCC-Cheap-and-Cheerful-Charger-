@@ -9,6 +9,9 @@ v2 - 31 Dec 2019
 
 TODO
     # Ensure only one instance could run
+    # run() instead of popen()
+    # requests instead of urllib
+    # 
 '''
 
 
@@ -37,12 +40,12 @@ IS_WINDOWS = platform.system() == 'Windows'
 
 
 if IS_WINDOWS:
+    import winsound
     import win32con
     import win32api
     import win32gui
     import win32event
     from winerror import ERROR_ALREADY_EXISTS
-
 
 #LOG_FILE = 'C:\\Tmp\\ccc.log'
 LOG_FILE = 'ccc.log'
@@ -50,9 +53,7 @@ LOG_FILE = 'ccc.log'
 MIN_CHARGE, MAX_CHARGE = 35, 65
 #MIN_CHARGE, MAX_CHARGE = 45, 55
 #MIN_CHARGE, MAX_CHARGE = 49, 51
-#MIN_CHARGE, MAX_CHARGE = 58, 60
-
-#MIN_CHARGE_MANUAL, MAX_CHARGE_MANUAL = 40, 60
+ANUAL = 40, 60
 MIN_CHARGE_MANUAL, MAX_CHARGE_MANUAL = MIN_CHARGE - 1, MAX_CHARGE + 1
 MAX_ALERT_CHARGE = MAX_CHARGE + 5
 MIN_ALERT_CHARGE = MIN_CHARGE - 5
@@ -105,7 +106,6 @@ def beep(frequency=2500, duration_msec=1000):
         return
 
     if IS_WINDOWS:
-        import winsound
         winsound.Beep(frequency, duration_msec)
     else:
         with Beeper() as beeper:
