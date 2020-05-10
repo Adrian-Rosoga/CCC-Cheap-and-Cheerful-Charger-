@@ -33,7 +33,7 @@ from urllib.error import URLError, HTTPError
 from abc import ABC, abstractmethod
 from contextlib import AbstractContextManager
 import psutil
-from pygame import mixer
+from playsound import playsound
 
 
 IS_WINDOWS = platform.system() == 'Windows'
@@ -47,7 +47,7 @@ if IS_WINDOWS:
     import win32event
     from winerror import ERROR_ALREADY_EXISTS
 
-#LOG_FILE = 'C:\\Tmp\\ccc.log'
+
 LOG_FILE = 'ccc.log'
 
 MIN_CHARGE, MAX_CHARGE = 35, 65
@@ -63,18 +63,18 @@ OFF = False
 TIMEOUT = 10
 
 
+# TODO - Cleanup needed. Legacy context manager used when using pygame to play sounds
 class Beeper(AbstractContextManager):
 
     def __enter__(self):
-        mixer.init()
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
-        mixer.quit()
+        pass
 
     @staticmethod
     def beep(soundfile='beep-low-freq.wav', duration_secs=1):
-        mixer.Sound(soundfile).play()
+        playsound(soundfile)
         time.sleep(duration_secs)
 
 
