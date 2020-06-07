@@ -82,22 +82,19 @@ def wifi_ssid() -> str:
     """Return the wifi ssid or empty string if not connected to wifi"""
 
     if not IS_WINDOWS:
-        popen = subprocess.Popen(['iwgetid'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        popen = subprocess.Popen(['iwgetid', '-r'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         output, _ = popen.communicate()
     else:
         popen = subprocess.Popen(['netsh', 'wlan', 'show', 'interfaces'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         output, _ = popen.communicate()
-        
-    print(output.decode())
-    return output.decode()  
+
+    return output.decode()
 
 
 def should_be_quiet() -> bool:
     """At work keep it quiet"""
-    
-    #return 'Barclays' in wifi_ssid()
-    wifi_ssid()
-    return False
+
+    return 'Barclays' in wifi_ssid()
 
 
 def beep(frequency=2500, duration_msec=1000):
@@ -386,7 +383,7 @@ class WatchdogThread(threading.Thread):
         while True:
 
             if battery_percent() >= MAX_ALERT_CHARGE:
-                logging.info(f'\t### Overcharged above {MAX_ALERT_CHARGE:.1f}% - {battery_percent():1.f}%')
+                logging.info(f'\t### Overcharged above {MAX_ALERT_CHARGE:.1f}% - {battery_percent():.1f}%')
                 if relay.state == 'ON':
                     beep(500, 3000)
 
@@ -423,8 +420,6 @@ class SingleInstanceThread(threading.Thread):
 
 
 def main():
-
-    
 
     logging.basicConfig(format="%(asctime)-15s - %(message)s",
                         datefmt='%Y-%m-%d %H:%M:%S',
