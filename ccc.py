@@ -50,7 +50,7 @@ if IS_WINDOWS:
 
 LOG_FILE = 'ccc.log'
 
-MIN_CHARGE, MAX_CHARGE = 35, 65
+MIN_CHARGE, MAX_CHARGE = 30, 75
 #MIN_CHARGE, MAX_CHARGE = 45, 55
 #MIN_CHARGE, MAX_CHARGE = 49, 51
 ANUAL = 40, 60
@@ -148,19 +148,27 @@ class HS100Relay(Relay):
     @property
     def state(self) -> str:
 
-        output = urllib.request.urlopen("http://192.168.1.103/status", timeout=TIMEOUT).read()
-        data = json.loads(output)
-        #print(output)
-        if data['system']['get_sysinfo']['state'] is None:
-            return 'N/A'
-        return 'ON' if data['system']['get_sysinfo']['state'] == 1 else 'OFF'
+        try:
+            output = urllib.request.urlopen("http://192.168.1.103/status", timeout=TIMEOUT).read()
+            data = json.loads(output)
+            #print(output)
+            if data['system']['get_sysinfo']['state'] is None:
+                return 'N/A'
+            return 'ON' if data['system']['get_sysinfo']['state'] == 1 else 'OFF'
+        except:
+            print('Error: In HS100.state()')
+            return('N/A')
+
 
     def turn_power(self, on_off: bool) -> None:
 
-        if on_off == ON:
-            urllib.request.urlopen("http://192.168.1.103/on", timeout=TIMEOUT)
-        else:
-            urllib.request.urlopen("http://192.168.1.103/off", timeout=TIMEOUT)
+        try:
+            if on_off == ON:
+                urllib.request.urlopen("http://192.168.1.103/on", timeout=TIMEOUT)
+            else:
+                urllib.request.urlopen("http://192.168.1.103/off", timeout=TIMEOUT)
+        except:
+            print('Error: In HS100.turn_power()')
 
 
 class EnergenieRelay(Relay):
@@ -177,7 +185,18 @@ class EnergenieRelay(Relay):
             urllib.request.urlopen("http://192.168.1.108:8000/off", timeout=TIMEOUT)
 
 
-relay = EnergenieRelay()
+class NoRelay(Relay):
+
+    @property
+    def state(self) -> str:
+        return 'N/A'
+
+    def turn_power(self, on_off: bool) -> None:
+        pass
+
+
+#relay = EnergenieRelay()
+relay = NoRelay()
 
 
 def power_plugged():
@@ -243,6 +262,8 @@ def control():
             if power_plugged() != 'ON':
                 logging.error('\t### Not charging although power turned ON')
                 # beep(1000, 1000)  # Get rid of the pesky 2 beeps
+                with Beeper() as beeper:
+                    beeper.beep('Battery_Alert.wav')
 
         # Turn power ON anyway to guard if the above command failed
         relay.turn_power(ON)
@@ -257,7 +278,9 @@ def control():
             time.sleep(3)
             if power_plugged() == 'ON':
                 logging.error('\t### Relay stuck on ON position!?')
-                beep(1000, 1000)
+                #beep(1000, 1000)
+                with Beeper() as beeper:
+                    beeper.beep('Battery_High.m4a')
 
         # Turn power OFF anyway to guard if the above command failed
         relay.turn_power(OFF)
