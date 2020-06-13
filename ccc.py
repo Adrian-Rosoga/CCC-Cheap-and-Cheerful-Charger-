@@ -50,10 +50,10 @@ if IS_WINDOWS:
 
 LOG_FILE = 'ccc.log'
 
-MIN_CHARGE, MAX_CHARGE = 30, 75
+MIN_CHARGE, MAX_CHARGE = 25, 75
 #MIN_CHARGE, MAX_CHARGE = 45, 55
 #MIN_CHARGE, MAX_CHARGE = 49, 51
-ANUAL = 40, 60
+MANUAL = 40, 60
 MIN_CHARGE_MANUAL, MAX_CHARGE_MANUAL = MIN_CHARGE - 1, MAX_CHARGE + 1
 MAX_ALERT_CHARGE = MAX_CHARGE + 5
 MIN_ALERT_CHARGE = MIN_CHARGE - 5
@@ -195,8 +195,8 @@ class NoRelay(Relay):
         pass
 
 
-#relay = EnergenieRelay()
-relay = NoRelay()
+relay = EnergenieRelay()
+#relay = NoRelay()
 
 
 def power_plugged():
@@ -258,7 +258,7 @@ def control():
 
             # Check power is indeed on - wait for a few secs to give the power the time to reach the
             # computer
-            time.sleep(3)
+            time.sleep(10)
             if power_plugged() != 'ON':
                 logging.error('\t### Not charging although power turned ON')
                 # beep(1000, 1000)  # Get rid of the pesky 2 beeps
@@ -275,7 +275,7 @@ def control():
             logging.info(f'\t{battery_percent():.1f}% - Turn power OFF')
 
             # Check power is indeed off - wait a few secs
-            time.sleep(3)
+            time.sleep(10)
             if power_plugged() == 'ON':
                 logging.error('\t### Relay stuck on ON position!?')
                 #beep(1000, 1000)
@@ -442,6 +442,46 @@ class SingleInstanceThread(threading.Thread):
                 time.sleep(10000)
 
 
+class SleepThread(threading.Thread):
+
+    def __init__(self):
+
+        threading.Thread.__init__(self)
+
+    def run(self):
+
+        SLEEP_AFTER_MINS = 5
+        SLEEP_AFTER_SECS = SLEEP_AFTER_MINS * 60
+
+        while True:
+
+            popen = subprocess.Popen(['xprintidle'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            output, _ = popen.communicate()
+
+            inactivity_secs = int(output)//1000
+
+            print(f'inactivity_secs={inactivity_secs}')
+
+            if inactivity_secs >= SLEEP_AFTER_SECS:
+
+                print('Turning power off and going to sleep...')
+
+                try:
+                    relay.turn_power(OFF)
+                except:
+                    print('Error: Exception thrown when calling relay.turn_power(OFF)')
+                
+                time.sleep(5)
+                os.system('systemctl suspend')
+
+            else:
+
+                print('Activity detected, not going to sleep!')
+
+            time.sleep(SLEEP_AFTER_SECS + 10)
+
+
+
 def main():
 
     logging.basicConfig(format="%(asctime)-15s - %(message)s",
@@ -465,10 +505,10 @@ def main():
 
     WatchdogThread().start()
 
+    SleepThread().start()
+
     if False and IS_WINDOWS:
         listen_for_sleep()
-
-    print("Main thread terminated.")
 
 
 if __name__ == "__main__":
