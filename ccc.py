@@ -236,7 +236,7 @@ def battery_percent():
     return psutil.sensors_battery().percent
 
 
-def control():
+def control(control=True):
 
     # Hack for manual charging
     if battery_percent() < MIN_CHARGE_MANUAL and power_plugged() == 'OFF':
@@ -245,6 +245,9 @@ def control():
         beep(2000, 3000)
 
     logging.info(f'{battery_percent():.1f}% Relay={relay.state} Power={power_plugged()}')
+
+    if not control:
+        return
 
     if relay.state == 'N/A':
         #return
@@ -365,16 +368,17 @@ def listen_for_sleep():
 
 class PowerControlThread(threading.Thread):
 
-    def __init__(self):
+    def __init__(self, control):
 
         threading.Thread.__init__(self)
+        self.control = control
 
     def run(self):
 
         while True:
 
             try:
-                control()
+                control(self.control)
             except HTTPError as e:
                 logging.info('HTTPError: The server couldn\'t fulfill the request')
                 logging.info('\tError code: ' + str(e.code))
@@ -407,13 +411,18 @@ class WatchdogThread(threading.Thread):
 
             if battery_percent() >= MAX_ALERT_CHARGE:
                 logging.info(f'\t### Overcharged above {MAX_ALERT_CHARGE:.1f}% - {battery_percent():.1f}%')
-                if relay.state == 'ON':
+                #if relay.state == 'ON':
+                if psutil.sensors_battery().power_plugged:
+                    beep(500, 3000)
+                    time.sleep(0.1)
+                    beep(500, 3000)
+                    time.sleep(0.1)
                     beep(500, 3000)
 
             if battery_percent() <= MIN_ALERT_CHARGE:
                 logging.info(f'\t### Undercharged below {MIN_ALERT_CHARGE:.1f}% - {battery_percent():.1f}%')
-                
-                if relay.state == 'OFF':
+                #if relay.state == 'OFF':
+                if not psutil.sensors_battery().power_plugged:
                     beep(500, 3000)
 
             time.sleep(60)
@@ -484,14 +493,21 @@ class SleepThread(threading.Thread):
 
 def main():
 
+    print('\n=== Cheap and Cheerful Charger ===\n')
+
     logging.basicConfig(format="%(asctime)-15s - %(message)s",
                         datefmt='%Y-%m-%d %H:%M:%S',
                         level=logging.INFO)
 
     parser = argparse.ArgumentParser(description='CCC (Cheap and Cheerful Charger)')
+    parser.add_argument('--nocontrol', help='no power control, just monitor', action='store_true')
     args = parser.parse_args()
 
-    print('\n=== Cheap and Cheerful Charger ===\n')
+    no_control = True if args.nocontrol else False
+    control = not no_control
+
+    if no_control:
+        logging.info('Monitoring mode, power source not controlled')
 
     sys.stderr = sys.stdout
 
@@ -501,11 +517,12 @@ def main():
 
     SingleInstanceThread().start()
 
-    PowerControlThread().start()
+    PowerControlThread(control).start()
 
     WatchdogThread().start()
 
-    SleepThread().start()
+    if control:
+        SleepThread().start()
 
     if False and IS_WINDOWS:
         listen_for_sleep()
