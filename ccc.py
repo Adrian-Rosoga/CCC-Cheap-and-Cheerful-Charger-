@@ -63,21 +63,6 @@ OFF = False
 TIMEOUT = 10
 
 
-# TODO - Cleanup needed. Legacy context manager used when using pygame to play sounds
-class Beeper(AbstractContextManager):
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        pass
-
-    @staticmethod
-    def beep(soundfile='beep-low-freq.wav', duration_secs=1):
-        playsound(soundfile)
-        time.sleep(duration_secs)
-
-
 def wifi_ssid() -> str:
     """Return the wifi ssid or empty string if not connected to wifi"""
 
@@ -105,8 +90,7 @@ def beep(frequency=2500, duration_msec=1000):
     if IS_WINDOWS:
         winsound.Beep(frequency, duration_msec)
     else:
-        with Beeper() as beeper:
-            beeper.beep()
+        playsound('beep-low-freq.wav')
 
 
 class Relay(ABC):
@@ -265,8 +249,7 @@ def control(control=True):
             if power_plugged() != 'ON':
                 logging.error('\t### Not charging although power turned ON')
                 # beep(1000, 1000)  # Get rid of the pesky 2 beeps
-                with Beeper() as beeper:
-                    beeper.beep('Battery_Alert.wav')
+                playsound('Battery_Alert.wav')
 
         # Turn power ON anyway to guard if the above command failed
         relay.turn_power(ON)
@@ -282,8 +265,7 @@ def control(control=True):
             if power_plugged() == 'ON':
                 logging.error('\t### Relay stuck on ON position!?')
                 #beep(1000, 1000)
-                with Beeper() as beeper:
-                    beeper.beep('Battery_High.m4a')
+                playsound('Battery_High.m4a')
 
         # Turn power OFF anyway to guard if the above command failed
         relay.turn_power(OFF)
