@@ -31,9 +31,9 @@ import platform
 from socket import timeout
 from urllib.error import URLError, HTTPError
 from abc import ABC, abstractmethod
-from contextlib import AbstractContextManager
 import psutil
 from playsound import playsound
+from enum import Enum, unique, auto
 
 
 IS_WINDOWS = platform.system() == 'Windows'
@@ -49,6 +49,7 @@ if IS_WINDOWS:
 
 
 LOG_FILE = 'ccc.log'
+TIMEOUT = 10
 
 MIN_CHARGE, MAX_CHARGE = 25, 75
 #MIN_CHARGE, MAX_CHARGE = 45, 55
@@ -58,13 +59,16 @@ MIN_CHARGE_MANUAL, MAX_CHARGE_MANUAL = MIN_CHARGE - 1, MAX_CHARGE + 1
 MAX_ALERT_CHARGE = MAX_CHARGE + 5
 MIN_ALERT_CHARGE = MIN_CHARGE - 5
 
-ON = True
-OFF = False
-TIMEOUT = 10
+
+@unique
+class RelayState(Enum):
+    ON = auto()
+    OFF = auto()
+    NA = auto()
 
 
 def wifi_ssid() -> str:
-    """Return the wifi ssid or empty string if not connected to wifi"""
+    """Wifi ssid or empty string if not connected to wifi"""
 
     if not IS_WINDOWS:
         popen = subprocess.Popen(['iwgetid', '-r'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -97,31 +101,31 @@ class Relay(ABC):
 
     @property
     @abstractmethod
-    def state(self) -> str:
-        return ""
+    def state(self):
+        return RelayState.NA
 
     @abstractmethod
-    def turn_power(self, on_off: bool) -> None:
+    def turn_power(self, on_off):
         pass
 
 
 class HIDRelay(Relay):
 
     @property
-    def state(self) -> str:
+    def state(self):
 
         popen = subprocess.Popen(['hidusb-relay-cmd.exe', 'state'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         output, _ = popen.communicate()
         if 'R1=ON' in output.decode("utf-8"):
-            return 'ON'
+            return RelayState.ON
         elif 'R1=OFF' in output.decode("utf-8"):
-            return 'OFF'
+            return RelayState.OFF
         else:
-            return 'N/A'
+            return RelayState.NA
 
-    def turn_power(self, on_off: bool) -> None:
+    def turn_power(self, on_off):
 
-        if on_off == ON:
+        if on_off:
             os.system('hidusb-relay-cmd.exe on 1')
         else:
             os.system('hidusb-relay-cmd.exe off 1')
@@ -130,24 +134,24 @@ class HIDRelay(Relay):
 class HS100Relay(Relay):
 
     @property
-    def state(self) -> str:
+    def state(self):
 
         try:
             output = urllib.request.urlopen("http://192.168.1.103/status", timeout=TIMEOUT).read()
             data = json.loads(output)
             #print(output)
             if data['system']['get_sysinfo']['state'] is None:
-                return 'N/A'
-            return 'ON' if data['system']['get_sysinfo']['state'] == 1 else 'OFF'
+                return RelayState.NA
+            return RelayState.ON if data['system']['get_sysinfo']['state'] == 1 else RelayState.OFF
         except:
             print('Error: In HS100.state()')
-            return('N/A')
+            return RelayState.NA
 
 
-    def turn_power(self, on_off: bool) -> None:
+    def turn_power(self, on_off):
 
         try:
-            if on_off == ON:
+            if on_off:
                 urllib.request.urlopen("http://192.168.1.103/on", timeout=TIMEOUT)
             else:
                 urllib.request.urlopen("http://192.168.1.103/off", timeout=TIMEOUT)
@@ -158,12 +162,12 @@ class HS100Relay(Relay):
 class EnergenieRelay(Relay):
 
     @property
-    def state(self) -> str:
-        return 'N/A'
+    def state(self):
+        return RelayState.NA
 
-    def turn_power(self, on_off: bool) -> None:
+    def turn_power(self, on_off):
 
-        if on_off == ON:
+        if on_off:
             urllib.request.urlopen("http://192.168.1.108:8000/on", timeout=TIMEOUT)
         else:
             urllib.request.urlopen("http://192.168.1.108:8000/off", timeout=TIMEOUT)
@@ -172,10 +176,10 @@ class EnergenieRelay(Relay):
 class NoRelay(Relay):
 
     @property
-    def state(self) -> str:
-        return 'N/A'
+    def state(self):
+        return RelayState.NA
 
-    def turn_power(self, on_off: bool) -> None:
+    def turn_power(self, on_off):
         pass
 
 
@@ -185,21 +189,14 @@ relay = EnergenieRelay()
 
 def power_plugged():
 
-    value = psutil.sensors_battery().power_plugged
-    if value:
-        return 'ON'
-    elif not value:
-        return 'OFF'
-    else:
-        logging.warning('\t### Cannot determine if plugged in or not')
-        return 'OFF'
+    return psutil.sensors_battery().power_plugged
 
 
 def turn_power_off():
 
     try:
         logging.info('Program getting killed, turning power off now...')
-        relay.turn_power(OFF)
+        relay.turn_power(False)
         logging.info('Program killed, turned power off')
     except urllib.error.URLError:
         logging.error('Caught urllib.error.URLError')
@@ -223,9 +220,9 @@ def battery_percent():
 def control(control=True):
 
     # Hack for manual charging
-    if battery_percent() < MIN_CHARGE_MANUAL and power_plugged() == 'OFF':
+    if battery_percent() < MIN_CHARGE_MANUAL and not power_plugged():
         beep(1000, 1000)
-    elif battery_percent() > MAX_CHARGE_MANUAL and power_plugged() == 'ON':
+    elif battery_percent() > MAX_CHARGE_MANUAL and power_plugged():
         beep(2000, 3000)
 
     logging.info(f'{battery_percent():.1f}% Relay={relay.state} Power={power_plugged()}')
@@ -233,13 +230,13 @@ def control(control=True):
     if not control:
         return
 
-    if relay.state == 'N/A':
+    if relay.state == RelayState.NA:
         #return
         pass
 
     if battery_percent() <= MIN_CHARGE:
 
-        if relay.state == 'OFF' or relay.state == 'N/A':
+        if relay.state == RelayState.OFF or relay.state == 'N/A':
             relay.turn_power(ON)
             logging.info(f'\t{battery_percent():.1f}% - Turn power ON')
 
@@ -256,25 +253,25 @@ def control(control=True):
 
     elif battery_percent() >= MAX_CHARGE:
 
-        if relay.state != 'OFF' or relay.state == 'N/A':
-            relay.turn_power(OFF)
+        if relay.state != 'OFF' or relay.state == RelayState.NA:
+            relay.turn_power(True)
             logging.info(f'\t{battery_percent():.1f}% - Turn power OFF')
 
             # Check power is indeed off - wait a few secs
             time.sleep(10)
-            if power_plugged() == 'ON':
+            if power_plugged():
                 logging.error('\t### Relay stuck on ON position!?')
                 #beep(1000, 1000)
                 playsound('Battery_High.m4a')
 
         # Turn power OFF anyway to guard if the above command failed
-        relay.turn_power(OFF)
+        relay.turn_power(False)
 
-    if relay.state == 'OFF' and power_plugged() == 'ON':
+    if relay.state == RelayState.OFF and power_plugged() == RelayState.ON:
         logging.warning('\t### Charging when not supposed to!?')
         beep(1000, 1000)
 
-    if relay.state == 'ON' and power_plugged() == 'OFF':
+    if relay.state == RelayState.ON and not power_plugged():
         logging.warning('\t### Plug charger in or check why not charging!')
         beep(1000, 1000)
 
@@ -282,9 +279,9 @@ def control(control=True):
 def test_on_off():
 
     while True:
-        relay.turn_power(ON)
+        relay.turn_power(True)
         time.sleep(30)
-        relay.turn_power(OFF)
+        relay.turn_power(False)
         time.sleep(30)
 
 
