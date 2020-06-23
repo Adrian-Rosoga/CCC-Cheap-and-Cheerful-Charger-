@@ -250,7 +250,7 @@ def control(control=True):
             if not power_plugged():
                 logging.error('\t### Not charging although power turned ON')
                 # beep(1000, 1000)  # Get rid of the pesky 2 beeps
-                playsound('Battery_Alert.wav')
+                playsound('Battery_Low_Alert.wav')
 
         # Turn power ON anyway to guard if the above command failed
         switch.turn_on()
@@ -266,7 +266,7 @@ def control(control=True):
             if power_plugged():
                 logging.error('\t### Switch stuck on ON position!?')
                 #beep(1000, 1000)
-                playsound('Battery_High.m4a')
+                playsound('Battery_High_Alert.wav')
 
         # Turn power OFF anyway to guard if the above command failed
         switch.turn_off()
@@ -503,7 +503,8 @@ def main():
     WatchdogThread().start()
 
     if control:
-        SleepThread().start()
+        if not IS_WINDOWS:
+            SleepThread().start()
 
     if False and IS_WINDOWS:
         listen_for_sleep()
