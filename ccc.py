@@ -198,7 +198,7 @@ def turn_power_off():
 
     try:
         logging.info('Program getting killed, turning power off now...')
-        Switch.turn_power(False)
+        switch.turn_off()
         logging.info('Program killed, turned power off')
     except urllib.error.URLError:
         logging.error('Caught urllib.error.URLError')
@@ -334,7 +334,7 @@ def listen_for_sleep():
                                        hinst,
                                        None)
     except Exception as e:
-        logging.info("Exception: %s" % str(e))
+        logging.error("Exception: %s" % str(e))
 
     logging.info(f'hwnd={hwnd}')
 
@@ -487,7 +487,7 @@ def main():
     control = not no_control
 
     if no_control:
-        switch=NoSwitch()
+        switch = NoSwitch()
         logging.info('Monitoring mode, power source not controlled')
 
     sys.stderr = sys.stdout
