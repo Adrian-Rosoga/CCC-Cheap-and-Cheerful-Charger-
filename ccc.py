@@ -225,22 +225,24 @@ def bool2onoff(value):
 
 def control(control=True):
 
+    battery_level = battery_percent()
+
     # Hack for manual charging
-    if battery_percent() < MIN_CHARGE_MANUAL and not power_plugged():
+    if battery_level < MIN_CHARGE_MANUAL and not power_plugged():
         beep(1000, 1000)
-    elif battery_percent() > MAX_CHARGE_MANUAL and power_plugged():
+    elif battery_level > MAX_CHARGE_MANUAL and power_plugged():
         beep(2000, 3000)
 
-    logging.info(f'{battery_percent():.1f}% SwitchState={str(switch.state.name)} Power={bool2onoff(power_plugged())}')
+    logging.info(f'{battery_level:.1f}% SwitchState={str(switch.state.name)} Power={bool2onoff(power_plugged())}')
 
     if not control:
         return
 
-    if battery_percent() <= MIN_CHARGE:
+    if battery_level <= MIN_CHARGE:
 
         if switch.state == Switch.State.OFF or switch.state == Switch.State.NA:
             switch.turn_on()
-            logging.info(f'\t{battery_percent():.1f}% - Turn power ON')
+            logging.info(f'\t{battery_level:.1f}% - Turn power ON')
 
             # Check power is indeed on - wait for a few secs to give the power the time to reach the
             # computer
@@ -253,11 +255,11 @@ def control(control=True):
         # Turn power ON anyway to guard if the above command failed
         switch.turn_on()
 
-    elif battery_percent() >= MAX_CHARGE:
+    elif battery_level >= MAX_CHARGE:
 
         if switch.state != Switch.State.OFF or switch.state == Switch.State.NA:
             switch.turn_on()
-            logging.info(f'\t{battery_percent():.1f}% - Turn power OFF')
+            logging.info(f'\t{battery_level:.1f}% - Turn power OFF')
 
             # Check power is indeed off - wait a few secs
             time.sleep(10)
@@ -384,8 +386,10 @@ class WatchdogThread(threading.Thread):
 
         while True:
 
-            if battery_percent() >= MAX_ALERT_CHARGE:
-                logging.info(f'\t### Overcharged above {MAX_ALERT_CHARGE:.1f}% - {battery_percent():.1f}%')
+            battery_level = battery_percent()
+
+            if battery_level >= MAX_ALERT_CHARGE:
+                logging.info(f'\t### Overcharged above {MAX_ALERT_CHARGE:.1f}% - {battery_level:.1f}%')
                 if power_plugged():
                     beep(500, 3000)
                     time.sleep(0.1)
@@ -393,8 +397,8 @@ class WatchdogThread(threading.Thread):
                     time.sleep(0.1)
                     beep(500, 3000)
 
-            if battery_percent() <= MIN_ALERT_CHARGE:
-                logging.info(f'\t### Undercharged below {MIN_ALERT_CHARGE:.1f}% - {battery_percent():.1f}%')
+            if battery_level <= MIN_ALERT_CHARGE:
+                logging.info(f'\t### Undercharged below {MIN_ALERT_CHARGE:.1f}% - {battery_level:.1f}%')
                 if not power_plugged():
                     beep(500, 3000)
 
