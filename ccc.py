@@ -470,9 +470,23 @@ def main():
     no_control = True if args.nocontrol else False
     control = not no_control
 
+    logging.info('*****************************************************')
+    logging.info('*****************************************************')
+
     if no_control:
         switch = NoSwitch()
         logging.info('Monitoring mode, power source not controlled')
+        min_level = MIN_CHARGE_MANUAL
+        max_level = MAX_CHARGE_MANUAL
+    else:
+        min_level = MIN_CHARGE
+        max_level = MAX_CHARGE
+
+    logging.info(f'Charge range is ({min_level}% - {max_level}%)')
+
+    logging.info('*****************************************************')
+    logging.info('*****************************************************')
+
 
     sys.stderr = sys.stdout
 
