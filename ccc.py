@@ -233,7 +233,7 @@ def control(control=True):
     elif battery_level > MAX_CHARGE_MANUAL and power_plugged():
         beep(2000, 3000)
 
-    logging.info(f'{battery_level:.1f}% SwitchState={str(switch.state.name)} Power={bool2onoff(power_plugged())}')
+    logging.info(f'{battery_level:.1f}% {switch.__class__.__name__} State={str(switch.state.name)} Power={bool2onoff(power_plugged())}')
 
     if not control:
         return
@@ -379,15 +379,13 @@ class PowerControlThread(threading.Thread):
 class WatchdogThread(threading.Thread):
 
     def __init__(self):
-
-        threading.Thread.__init__(self)
+        super().__init__()
 
     def run(self):
 
         while True:
 
             battery_level = battery_percent()
-
             if battery_level >= MAX_ALERT_CHARGE:
                 logging.info(f'\t### Overcharged above {MAX_ALERT_CHARGE:.1f}% - {battery_level:.1f}%')
                 if power_plugged():
@@ -396,8 +394,7 @@ class WatchdogThread(threading.Thread):
                     beep(500, 3000)
                     time.sleep(0.1)
                     beep(500, 3000)
-
-            if battery_level <= MIN_ALERT_CHARGE:
+            elif battery_level <= MIN_ALERT_CHARGE:
                 logging.info(f'\t### Undercharged below {MIN_ALERT_CHARGE:.1f}% - {battery_level:.1f}%')
                 if not power_plugged():
                     beep(500, 3000)
@@ -408,8 +405,7 @@ class WatchdogThread(threading.Thread):
 class SingleInstanceThread(threading.Thread):
 
     def __init__(self):
-
-        threading.Thread.__init__(self)
+        super().__init__()
 
     def run(self):
 
@@ -430,9 +426,8 @@ class SingleInstanceThread(threading.Thread):
 
 class SleepThread(threading.Thread):
 
-    def __init__(self):
-
-        threading.Thread.__init__(self)
+    #def __init__(self):
+    #    super().__init__()
 
     def run(self):
 
@@ -442,29 +437,23 @@ class SleepThread(threading.Thread):
         while True:
 
             output = subprocess.check_output(['xprintidle'])
-
             inactivity_secs = int(output.decode()) // 1000
 
-            logging.info(f'inactivity_secs={inactivity_secs}')
-
             if inactivity_secs >= SLEEP_AFTER_SECS:
-
-                logging.info('Turning power off and going to sleep...')
+                logging.info(f'No user activity in the last {inactivity_secs} seconds. Turning power off and going to sleep...')
 
                 try:
                     switch.turn_off()
                 except:
-                    logging.error('Exception thrown when calling Switch.turn_power(False)')
+                    logging.error('Exception thrown when turning the switch off')
                 
                 time.sleep(5)
                 os.system('systemctl suspend')
 
             else:
-
-                logging.info('Activity detected, not going to sleep!')
+                logging.info(f'User activity detected {inactivity_secs} secs ago. Staying awake!')
 
             time.sleep(SLEEP_AFTER_SECS + 10)
-
 
 
 def main():
