@@ -229,8 +229,10 @@ def control(control=True):
 
     # Hack for manual charging
     if battery_level < MIN_CHARGE_MANUAL and not power_plugged():
+        logging.info('Beep on battery_level < MIN_CHARGE_MANUAL and not power_plugged()')
         beep(1000, 1000)
     elif battery_level > MAX_CHARGE_MANUAL and power_plugged():
+        logging.info('Beep on battery_level > MAX_CHARGE_MANUAL and power_plugged()')
         beep(2000, 3000)
 
     logging.info(f'{battery_level:.1f}% {switch.__class__.__name__} State={str(switch.state.name)} Power={bool2onoff(power_plugged())}')
@@ -258,7 +260,7 @@ def control(control=True):
     elif battery_level >= MAX_CHARGE:
 
         if switch.state != Switch.State.OFF or switch.state == Switch.State.NA:
-            switch.turn_on()
+            switch.turn_off()
             logging.info(f'\t{battery_level:.1f}% - Turn power OFF')
 
             # Check power is indeed off - wait a few secs
@@ -346,8 +348,7 @@ def listen_for_sleep():
 class PowerControlThread(threading.Thread):
 
     def __init__(self, control):
-
-        threading.Thread.__init__(self)
+        super().__init__()
         self.control = control
 
     def run(self):
@@ -378,9 +379,6 @@ class PowerControlThread(threading.Thread):
 
 class WatchdogThread(threading.Thread):
 
-    def __init__(self):
-        super().__init__()
-
     def run(self):
 
         while True:
@@ -404,9 +402,6 @@ class WatchdogThread(threading.Thread):
 
 class SingleInstanceThread(threading.Thread):
 
-    def __init__(self):
-        super().__init__()
-
     def run(self):
 
         if IS_WINDOWS:
@@ -425,9 +420,6 @@ class SingleInstanceThread(threading.Thread):
 
 
 class SleepThread(threading.Thread):
-
-    #def __init__(self):
-    #    super().__init__()
 
     def run(self):
 
