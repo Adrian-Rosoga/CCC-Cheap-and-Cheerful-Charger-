@@ -52,7 +52,7 @@ if IS_WINDOWS:
 LOG_FILE = 'ccc.log'
 TIMEOUT = 10
 
-MIN_CHARGE, MAX_CHARGE = 25, 60
+MIN_CHARGE, MAX_CHARGE = 25, 75
 #MIN_CHARGE, MAX_CHARGE = 57, 59
 #MIN_CHARGE, MAX_CHARGE = 49, 51
 
@@ -300,6 +300,7 @@ def control(control=True):
         playsound('Battery_High_Alert.wav')
 
     logging.info(f'{battery_level:.1f}% {switch.__class__.__name__} State={str(switch.state.name)} Power={bool2onoff(power_plugged())}')
+
 
     if battery_level <= MIN_CHARGE and Using_Smart_Switch and not Power_On:
         sendCommand(commands["on"])
