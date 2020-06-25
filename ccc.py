@@ -301,6 +301,13 @@ def control(control=True):
 
     logging.info(f'{battery_level:.1f}% {switch.__class__.__name__} State={str(switch.state.name)} Power={bool2onoff(power_plugged())}')
 
+    if battery_level <= MIN_CHARGE and Using_Smart_Switch and not Power_On:
+        sendCommand(commands["on"])
+        Power_On = True
+    elif battery_level >= MAX_CHARGE and Using_Smart_Switch and Power_On:
+        sendCommand(commands["off"])
+        Power_On = False
+
     if not control:
         return
 
@@ -321,9 +328,6 @@ def control(control=True):
         # Turn power ON anyway to guard if the above command failed
         switch.turn_on()
 
-        if Using_Smart_Switch and not Power_On:
-            sendCommand(commands["on"])
-            Power_On = True
 
     elif battery_level >= MAX_CHARGE:
 
@@ -341,9 +345,6 @@ def control(control=True):
         # Turn power OFF anyway to guard if the above command failed
         switch.turn_off()
 
-        if Using_Smart_Switch and Power_On:
-            sendCommand(commands["off"])
-            Power_On = False
 
     if switch.state == Switch.State.OFF and power_plugged():
         logging.warning('\t### Charging when not supposed to!?')
