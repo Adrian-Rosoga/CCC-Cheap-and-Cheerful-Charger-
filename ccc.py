@@ -32,6 +32,9 @@ from abc import ABC, abstractmethod
 import psutil
 from playsound import playsound
 from enum import Enum, unique, auto
+import socket
+from struct import pack
+import parser
 
 
 IS_WINDOWS = platform.system() == 'Windows'
@@ -61,6 +64,62 @@ MIN_ALERT_CHARGE = MIN_CHARGE - 5
 
 Switch = None
 
+Power_On = True #  The power starts as on
+
+# Encrypts value to be sent
+def encrypt(string):
+	key = 171
+	result = pack('>I', len(string))
+	for i in string:
+		a = key ^ ord(i)
+		key = a
+		result += bytes([a])
+	return result
+
+# Decrypts return value
+def decrypt(string):
+	key = 171
+	result = ""
+	for i in string:
+		a = key ^ i
+		key = i
+		result += chr(a)
+	return result
+
+# Defining static vars
+IP = "192.168.0.9" #  Checks IP is valid, change to your smart-plug IP
+PORT = 9999 #  9999 is default port. Change if need to
+
+# Basic commands
+commands = {'info'     : '{"system":{"get_sysinfo":{}}}',
+			'on'       : '{"system":{"set_relay_state":{"state":1}}}',
+			'off'      : '{"system":{"set_relay_state":{"state":0}}}',
+	    	'ledoff'   : '{"system":{"set_led_off":{"off":1}}}',
+			'ledon'    : '{"system":{"set_led_off":{"off":0}}}',
+			'cloudinfo': '{"cnCloud":{"get_info":{}}}',
+			'wlanscan' : '{"netif":{"get_scaninfo":{"refresh":0}}}',
+			'time'     : '{"time":{"get_time":{}}}',
+			'schedule' : '{"schedule":{"get_rules":{}}}',
+			'countdown': '{"count_down":{"get_rules":{}}}',
+			'antitheft': '{"anti_theft":{"get_rules":{}}}',
+			'reboot'   : '{"system":{"reboot":{"delay":1}}}',
+			'reset'    : '{"system":{"reset":{"delay":1}}}',
+			'energy'   : '{"emeter":{"get_realtime":{}}}'
+}
+
+# Sends command to device
+def sendCommand(cmd):
+    try:
+        sock_tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock_tcp.settimeout(TIMEOUT)
+        sock_tcp.connect((IP, PORT))
+        sock_tcp.settimeout(None)
+        sock_tcp.send(encrypt(cmd))
+        data = sock_tcp.recv(2048)
+        sock_tcp.close()
+
+    except socket.error:
+	    quit("Could not connect to host " + IP + ":" + str(PORT))
 
 def wifi_ssid() -> str:
     """Wifi ssid or empty string if not connected to wifi"""
@@ -200,6 +259,8 @@ def turn_power_off():
     try:
         logging.info('Program getting killed, turning power off now...')
         switch.turn_off()
+        if Using_Smart_Switch:
+            sendCommand(commands["on"])
         logging.info('Program killed, turned power off')
     except urllib.error.URLError:
         logging.error('Caught urllib.error.URLError')
@@ -225,7 +286,7 @@ def bool2onoff(value):
 
 
 def control(control=True):
-
+    global Power_On
     battery_level = battery_percent()
 
     # Hack for manual charging
@@ -239,6 +300,14 @@ def control(control=True):
         playsound('Battery_High_Alert.wav')
 
     logging.info(f'{battery_level:.1f}% {switch.__class__.__name__} State={str(switch.state.name)} Power={bool2onoff(power_plugged())}')
+
+
+    if battery_level <= MIN_CHARGE and Using_Smart_Switch and not Power_On:
+        sendCommand(commands["on"])
+        Power_On = True
+    elif battery_level >= MAX_CHARGE and Using_Smart_Switch and Power_On:
+        sendCommand(commands["off"])
+        Power_On = False
 
     if not control:
         return
@@ -260,6 +329,7 @@ def control(control=True):
         # Turn power ON anyway to guard if the above command failed
         switch.turn_on()
 
+
     elif battery_level >= MAX_CHARGE:
 
         if switch.state != Switch.State.OFF or switch.state == Switch.State.NA:
@@ -275,6 +345,7 @@ def control(control=True):
 
         # Turn power OFF anyway to guard if the above command failed
         switch.turn_off()
+
 
     if switch.state == Switch.State.OFF and power_plugged():
         logging.warning('\t### Charging when not supposed to!?')
@@ -461,13 +532,16 @@ def main():
 
     parser = argparse.ArgumentParser(description='CCC (Cheap and Cheerful Charger)')
     parser.add_argument('--nocontrol', help='no power control, just monitor', action='store_true')
+    parser.add_argument('--tplink', help='Turns off tplink if above power', action='store_true')
     args = parser.parse_args()
 
     global switch
 
     switch = EnergenieSwitch()
 
-    no_control = True if args.nocontrol else False
+    no_control = True if args.nocontrol or args.tplink else False
+    global Using_Smart_Switch
+    Using_Smart_Switch = True if args.tplink else False
     control = not no_control
 
     logging.info('*****************************************************')
