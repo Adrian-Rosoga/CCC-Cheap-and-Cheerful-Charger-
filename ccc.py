@@ -52,7 +52,7 @@ if IS_WINDOWS:
 LOG_FILE = 'ccc.log'
 TIMEOUT = 10
 
-MIN_CHARGE, MAX_CHARGE = 25, 75
+MIN_CHARGE, MAX_CHARGE = 25, 60
 #MIN_CHARGE, MAX_CHARGE = 57, 59
 #MIN_CHARGE, MAX_CHARGE = 49, 51
 
@@ -286,7 +286,7 @@ def bool2onoff(value):
 
 
 def control(control=True):
-
+    global Power_On
     battery_level = battery_percent()
 
     # Hack for manual charging
