@@ -55,56 +55,57 @@ TIMEOUT = 10
 MIN_CHARGE, MAX_CHARGE = 25, 75
 #MIN_CHARGE, MAX_CHARGE = 57, 59
 #MIN_CHARGE, MAX_CHARGE = 49, 51
+#MIN_CHARGE, MAX_CHARGE = 42, 47
 
 MIN_CHARGE_MANUAL, MAX_CHARGE_MANUAL = MIN_CHARGE - 1, MAX_CHARGE + 1
 
 MAX_ALERT_CHARGE = MAX_CHARGE + 5
 MIN_ALERT_CHARGE = MIN_CHARGE - 5
 
+# Defining static vars
+IP = "192.168.1.157" #  Checks IP is valid, change to your smart-plug IP
+PORT = 9999 #  9999 is default port. Change if need to
 
-Switch = None
+switch = None
 
-Power_On = True #  The power starts as on
 
 # Encrypts value to be sent
 def encrypt(string):
-	key = 171
-	result = pack('>I', len(string))
-	for i in string:
-		a = key ^ ord(i)
-		key = a
-		result += bytes([a])
-	return result
+    key = 171
+    result = pack('>I', len(string))
+    for i in string:
+        a = key ^ ord(i)
+        key = a
+        result += bytes([a])
+    return result
+
 
 # Decrypts return value
 def decrypt(string):
-	key = 171
-	result = ""
-	for i in string:
-		a = key ^ i
-		key = i
-		result += chr(a)
-	return result
+    key = 171
+    result = ""
+    for i in string:
+        a = key ^ i
+        key = i
+        result += chr(a)
+    return result
 
-# Defining static vars
-IP = "192.168.0.9" #  Checks IP is valid, change to your smart-plug IP
-PORT = 9999 #  9999 is default port. Change if need to
 
 # Basic commands
 commands = {'info'     : '{"system":{"get_sysinfo":{}}}',
-			'on'       : '{"system":{"set_relay_state":{"state":1}}}',
-			'off'      : '{"system":{"set_relay_state":{"state":0}}}',
-	    	'ledoff'   : '{"system":{"set_led_off":{"off":1}}}',
-			'ledon'    : '{"system":{"set_led_off":{"off":0}}}',
-			'cloudinfo': '{"cnCloud":{"get_info":{}}}',
-			'wlanscan' : '{"netif":{"get_scaninfo":{"refresh":0}}}',
-			'time'     : '{"time":{"get_time":{}}}',
-			'schedule' : '{"schedule":{"get_rules":{}}}',
-			'countdown': '{"count_down":{"get_rules":{}}}',
-			'antitheft': '{"anti_theft":{"get_rules":{}}}',
-			'reboot'   : '{"system":{"reboot":{"delay":1}}}',
-			'reset'    : '{"system":{"reset":{"delay":1}}}',
-			'energy'   : '{"emeter":{"get_realtime":{}}}'
+            'on'       : '{"system":{"set_relay_state":{"state":1}}}',
+            'off'      : '{"system":{"set_relay_state":{"state":0}}}',
+            'ledoff'   : '{"system":{"set_led_off":{"off":1}}}',
+            'ledon'    : '{"system":{"set_led_off":{"off":0}}}',
+            'cloudinfo': '{"cnCloud":{"get_info":{}}}',
+            'wlanscan' : '{"netif":{"get_scaninfo":{"refresh":0}}}',
+            'time'     : '{"time":{"get_time":{}}}',
+            'schedule' : '{"schedule":{"get_rules":{}}}',
+            'countdown': '{"count_down":{"get_rules":{}}}',
+            'antitheft': '{"anti_theft":{"get_rules":{}}}',
+            'reboot'   : '{"system":{"reboot":{"delay":1}}}',
+            'reset'    : '{"system":{"reset":{"delay":1}}}',
+            'energy'   : '{"emeter":{"get_realtime":{}}}'
 }
 
 # Sends command to device
@@ -117,9 +118,9 @@ def sendCommand(cmd):
         sock_tcp.send(encrypt(cmd))
         data = sock_tcp.recv(2048)
         sock_tcp.close()
-
     except socket.error:
-	    quit("Could not connect to host " + IP + ":" + str(PORT))
+        logging.error("Could not connect to host " + IP + ":" + str(PORT))
+
 
 def wifi_ssid() -> str:
     """Wifi ssid or empty string if not connected to wifi"""
@@ -196,6 +197,7 @@ class HS100Switch(Switch):
 
     @property
     def state(self):
+        return Switch.State.NA
 
         try:
             output = urllib.request.urlopen("http://192.168.1.103/status", timeout=TIMEOUT).read()
@@ -209,18 +211,10 @@ class HS100Switch(Switch):
             return Switch.State.NA
 
     def turn_on(self):
-
-        try:
-            urllib.request.urlopen("http://192.168.1.103/on", timeout=TIMEOUT)
-        except:
-            logging.error('Exception thrown in HS100.turn_power()')
+        sendCommand(commands["on"])
 
     def turn_off(self):
-
-        try:
-            urllib.request.urlopen("http://192.168.1.103/off", timeout=TIMEOUT)
-        except:
-            logging.error('Error: In HS100.turn_power()')
+        sendCommand(commands["off"])
 
 
 class EnergenieSwitch(Switch):
@@ -259,8 +253,6 @@ def turn_power_off():
     try:
         logging.info('Program getting killed, turning power off now...')
         switch.turn_off()
-        if Using_Smart_Switch:
-            sendCommand(commands["on"])
         logging.info('Program killed, turned power off')
     except urllib.error.URLError:
         logging.error('Caught urllib.error.URLError')
@@ -286,7 +278,9 @@ def bool2onoff(value):
 
 
 def control(control=True):
-    global Power_On
+
+    global switch
+
     battery_level = battery_percent()
 
     # Hack for manual charging
@@ -301,13 +295,10 @@ def control(control=True):
 
     logging.info(f'{battery_level:.1f}% {switch.__class__.__name__} State={str(switch.state.name)} Power={bool2onoff(power_plugged())}')
 
-
-    if battery_level <= MIN_CHARGE and Using_Smart_Switch and not Power_On:
-        sendCommand(commands["on"])
-        Power_On = True
-    elif battery_level >= MAX_CHARGE and Using_Smart_Switch and Power_On:
-        sendCommand(commands["off"])
-        Power_On = False
+    if battery_level <= MIN_CHARGE and not power_plugged():
+        switch.turn_on()
+    elif battery_level >= MAX_CHARGE and power_plugged():
+        switch.turn_on()
 
     if not control:
         return
@@ -328,7 +319,6 @@ def control(control=True):
 
         # Turn power ON anyway to guard if the above command failed
         switch.turn_on()
-
 
     elif battery_level >= MAX_CHARGE:
 
@@ -354,15 +344,6 @@ def control(control=True):
     if switch.state == Switch.State.ON and not power_plugged():
         logging.warning('\t### Plug charger in or check why not charging!')
         beep(1000, 1000)
-
-
-def test_on_off():
-
-    while True:
-        switch.turn_on()
-        time.sleep(30)
-        switch.turn_off()
-        time.sleep(30)
 
 
 def wndproc(hwnd, msg, wparam, lparam):
@@ -522,6 +503,15 @@ class SleepThread(threading.Thread):
             time.sleep(SLEEP_AFTER_SECS + 10)
 
 
+def test_on_off():
+
+    while True:
+        switch.turn_on()
+        time.sleep(30)
+        switch.turn_off()
+        time.sleep(30)
+
+
 def main():
 
     print('\n=== Cheap and Cheerful Charger ===\n')
@@ -532,22 +522,24 @@ def main():
 
     parser = argparse.ArgumentParser(description='CCC (Cheap and Cheerful Charger)')
     parser.add_argument('--nocontrol', help='no power control, just monitor', action='store_true')
-    parser.add_argument('--tplink', help='Turns off tplink if above power', action='store_true')
+    parser.add_argument('--inactivity', help='make computer sleep on inactivity', action='store_true')
     args = parser.parse_args()
 
     global switch
 
-    switch = EnergenieSwitch()
+    #switch = EnergenieSwitch()
+    switch = HS100Switch()
 
-    no_control = True if args.nocontrol or args.tplink else False
-    global Using_Smart_Switch
-    Using_Smart_Switch = True if args.tplink else False
-    control = not no_control
+    #test_on_off()
+
+    sleep_on_inactivity = args.inactivity
+
+    control = not args.nocontrol
 
     logging.info('*****************************************************')
     logging.info('*****************************************************')
 
-    if no_control:
+    if not control:
         switch = NoSwitch()
         logging.info('Monitoring mode, power source not controlled')
         min_level = MIN_CHARGE_MANUAL
@@ -561,7 +553,6 @@ def main():
     logging.info('*****************************************************')
     logging.info('*****************************************************')
 
-
     sys.stderr = sys.stdout
 
     if not IS_WINDOWS:
@@ -574,7 +565,7 @@ def main():
 
     WatchdogThread().start()
 
-    if control:
+    if sleep_on_inactivity:
         if not IS_WINDOWS:
             SleepThread().start()
 
