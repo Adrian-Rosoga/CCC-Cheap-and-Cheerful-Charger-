@@ -240,23 +240,12 @@ class NoSwitch(Switch):
 
 
 def power_plugged():
-
     return psutil.sensors_battery().power_plugged
 
 
 def turn_power_off():
-
-    try:
-        logging.info('Program getting killed, turning power off now...')
-        switch.turn_off()
-        logging.info('Program killed, turned power off')
-    except urllib.error.URLError:
-        logging.error('Caught urllib.error.URLError')
-    except OSError:
-        logging.error('Caught OSError')
-    except Exception:
-        logging.error('TODO: Exception caught in turn_power_off()')
-        logging.error("Something bad happened", exc_info=True)
+    logging.info('Program terminating, turning power off...')
+    switch.turn_off()
 
 
 def handler(signum, frame):
@@ -291,11 +280,6 @@ def control(control=True):
 
     logging.info(f'{battery_level:.1f}% {switch.__class__.__name__} State={str(switch.state.name)} Power={bool2onoff(power_plugged())}')
 
-    if battery_level <= MIN_CHARGE and not power_plugged():
-        switch.turn_on()
-    elif battery_level >= MAX_CHARGE and power_plugged():
-        switch.turn_on()
-
     if not control:
         return
 
@@ -303,10 +287,9 @@ def control(control=True):
 
         if switch.state == Switch.State.OFF or switch.state == Switch.State.NA:
             switch.turn_on()
-            logging.info(f'\t{battery_level:.1f}% - Turn power ON')
+            logging.info(f'\t{battery_level:.1f}% - Turned power ON')
 
-            # Check power is indeed on - wait for a few secs to give the power the time to reach the
-            # computer
+            # Check power is indeed on - wait for a few secs to give the power the time to reach the computer
             time.sleep(10)
             if not power_plugged():
                 logging.error('\t### Not charging although power turned ON')
@@ -320,7 +303,7 @@ def control(control=True):
 
         if switch.state != Switch.State.OFF or switch.state == Switch.State.NA:
             switch.turn_off()
-            logging.info(f'\t{battery_level:.1f}% - Turn power OFF')
+            logging.info(f'\t{battery_level:.1f}% - Turned power OFF')
 
             # Check power is indeed off - wait a few secs
             time.sleep(10)
@@ -332,15 +315,13 @@ def control(control=True):
         # Turn power OFF anyway to guard if the above command failed
         switch.turn_off()
 
-
     if switch.state == Switch.State.OFF and power_plugged():
         logging.warning('\t### Charging when not supposed to!?')
         beep(1000, 1000)
 
-    # TODO: Dubious logic
-    #if switch.state == Switch.State.ON and not power_plugged():
-    #    logging.warning('\t### Plug charger in or check why not charging!')
-    #    beep(1000, 1000)
+    if switch.state == Switch.State.ON and not power_plugged():
+        logging.warning('\t### Plug charger in or check why not charging!')
+        beep(1000, 1000)
 
 
 def wndproc(hwnd, msg, wparam, lparam):
@@ -388,7 +369,7 @@ def listen_for_sleep():
                                        hinst,
                                        None)
     except Exception as e:
-        logging.error("Exception: %s" % str(e))
+        logging.error(f'Exception caught: {str(e)}')
 
     logging.info(f'hwnd={hwnd}')
 
@@ -412,19 +393,15 @@ class PowerControlThread(threading.Thread):
             except HTTPError as e:
                 logging.error('HTTPError: The server couldn\'t fulfill the request')
                 logging.error('\tError code: ' + str(e.code))
-                #beep(600, 2000)
             except URLError as e:
                 logging.error('URLError: We failed to reach a server')
                 logging.error('\tReason: ' + str(e.reason))
-                #beep(600, 2000)
             except timeout:
                 logging.error('timeout: socket timed out')
-                #beep(600, 2000)
             except Exception as ex:
                 logging.error('Exception: ' + ex.__class__.__name__)
                 logging.error(ex)
                 traceback.print_exc(file=sys.stdout)
-                #beep(600, 2000)
 
             time.sleep(60)
 
@@ -552,6 +529,7 @@ def main():
 
     sys.stderr = sys.stdout
 
+    # To prevent overcharging tunr power off when killing the program
     if not IS_WINDOWS:
         atexit.register(turn_power_off)
         signal.signal(signal.SIGUSR1, handler)
