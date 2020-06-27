@@ -200,7 +200,7 @@ class HS100Switch(Switch):
     def state(self):
         response = sendCommand(commands["info"])
         if response is None:    # Because on holiday for example
-            return witch.State.NA
+            return Switch.State.NA
         info = decrypt(response)
         info = '{' + info[5:]
         data = json.loads(info)
