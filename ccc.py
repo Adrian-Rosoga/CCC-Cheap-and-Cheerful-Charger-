@@ -198,7 +198,10 @@ class HS100Switch(Switch):
 
     @property
     def state(self):
-        info = decrypt(sendCommand(commands["info"]))
+        response = sendCommand(commands["info"])
+        if response is None:    # Because on holiday for example
+            return witch.State.NA
+        info = decrypt(response)
         info = '{' + info[5:]
         data = json.loads(info)
         return Switch.State.ON if data['system']['get_sysinfo']['relay_state'] == 1 else Switch.State.OFF
