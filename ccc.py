@@ -118,6 +118,7 @@ def sendCommand(cmd):
         sock_tcp.send(encrypt(cmd))
         data = sock_tcp.recv(2048)
         sock_tcp.close()
+        return data
     except socket.error:
         logging.error("Could not connect to host " + IP + ":" + str(PORT))
 
@@ -197,18 +198,10 @@ class HS100Switch(Switch):
 
     @property
     def state(self):
-        return Switch.State.NA
-
-        try:
-            output = urllib.request.urlopen("http://192.168.1.103/status", timeout=TIMEOUT).read()
-            data = json.loads(output)
-            logging.debug(output)
-            if data['system']['get_sysinfo']['state'] is None:
-                return Switch.State.NA
-            return Switch.State.ON if data['system']['get_sysinfo']['state'] == 1 else Switch.State.OFF
-        except:
-            logging.error('Error: In HS100.state()')
-            return Switch.State.NA
+        info = decrypt(sendCommand(commands["info"]))
+        info = '{' + info[5:]
+        data = json.loads(info)
+        return Switch.State.ON if data['system']['get_sysinfo']['relay_state'] == 1 else Switch.State.OFF
 
     def turn_on(self):
         sendCommand(commands["on"])
@@ -341,9 +334,10 @@ def control(control=True):
         logging.warning('\t### Charging when not supposed to!?')
         beep(1000, 1000)
 
-    if switch.state == Switch.State.ON and not power_plugged():
-        logging.warning('\t### Plug charger in or check why not charging!')
-        beep(1000, 1000)
+    # TODO: Dubious logic
+    #if switch.state == Switch.State.ON and not power_plugged():
+    #    logging.warning('\t### Plug charger in or check why not charging!')
+    #    beep(1000, 1000)
 
 
 def wndproc(hwnd, msg, wparam, lparam):
