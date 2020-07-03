@@ -290,13 +290,18 @@ def control(control=True):
 
             # Check power is indeed on - wait for a few secs to give the power the time to reach the computer
             time.sleep(10)
-            if not power_plugged():
-                logging.error('\t### Not charging although power turned ON')
-                beep(1000, 1000)  # Get rid of the pesky 2 beeps
-                playsound('Battery_Low_Alert.wav')
+
+        if not power_plugged():
+            logging.error('\t### Not charging')
+            beep(1000, 1000)  # Get rid of the pesky 2 beeps
+            playsound('Battery_Low_Alert.wav')
 
         # Turn power ON anyway to guard if the above command failed
         switch.turn_on()
+
+        if switch.state == Switch.State.ON and not power_plugged():
+            logging.warning('\t### Switch is ON but still not charging!')
+            beep(1000, 1000)
 
     elif battery_level >= MAX_CHARGE:
 
@@ -314,13 +319,9 @@ def control(control=True):
         # Turn power OFF anyway to guard if the above command failed
         switch.turn_off()
 
-    if switch.state == Switch.State.OFF and power_plugged():
-        logging.warning('\t### Charging when not supposed to!?')
-        beep(1000, 1000)
-
-    if switch.state == Switch.State.ON and not power_plugged():
-        logging.warning('\t### Plug charger in or check why not charging!')
-        beep(1000, 1000)
+        if switch.state == Switch.State.OFF and power_plugged():
+            logging.warning('\t### Switch is OFF but still charging')
+            beep(1000, 1000)
 
 
 def wndproc(hwnd, msg, wparam, lparam):
