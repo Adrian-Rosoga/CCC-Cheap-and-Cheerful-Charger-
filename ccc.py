@@ -53,9 +53,7 @@ LOG_FILE = 'ccc.log'
 TIMEOUT = 10
 
 MIN_CHARGE, MAX_CHARGE = 25, 75
-#MIN_CHARGE, MAX_CHARGE = 57, 59
-#MIN_CHARGE, MAX_CHARGE = 49, 51
-#MIN_CHARGE, MAX_CHARGE = 42, 47
+MIN_CHARGE, MAX_CHARGE = 45, 55
 
 MIN_CHARGE_MANUAL, MAX_CHARGE_MANUAL = MIN_CHARGE - 1, MAX_CHARGE + 1
 
@@ -268,15 +266,16 @@ def control(control=True):
 
     battery_level = battery_percent()
 
-    # Hack for manual charging
-    if battery_level <= MIN_CHARGE_MANUAL and not power_plugged():
-        logging.info('Beep on battery_level < MIN_CHARGE_MANUAL and not power_plugged()')
-        beep(1000, 1000)
-        playsound('Battery_Low_Alert.wav')
-    elif battery_level >= MAX_CHARGE_MANUAL and power_plugged():
-        logging.info('Beep on battery_level > MAX_CHARGE_MANUAL and power_plugged()')
-        beep(2000, 3000)
-        playsound('Battery_High_Alert.wav')
+    if False:
+        # Hack for manual charging
+        if battery_level <= MIN_CHARGE_MANUAL and not power_plugged():
+            logging.info('Beep on battery_level < MIN_CHARGE_MANUAL and not power_plugged()')
+            beep(1000, 1000)
+            playsound('Battery_Low_Alert.wav')
+        elif battery_level >= MAX_CHARGE_MANUAL and power_plugged():
+            logging.info('Beep on battery_level > MAX_CHARGE_MANUAL and power_plugged()')
+            beep(2000, 3000)
+            playsound('Battery_High_Alert.wav')
 
     logging.info(f'{battery_level:.1f}% {switch.__class__.__name__} State={str(switch.state.name)} Power={bool2onoff(power_plugged())}')
 
@@ -293,7 +292,7 @@ def control(control=True):
             time.sleep(10)
             if not power_plugged():
                 logging.error('\t### Not charging although power turned ON')
-                # beep(1000, 1000)  # Get rid of the pesky 2 beeps
+                beep(1000, 1000)  # Get rid of the pesky 2 beeps
                 playsound('Battery_Low_Alert.wav')
 
         # Turn power ON anyway to guard if the above command failed
@@ -309,7 +308,7 @@ def control(control=True):
             time.sleep(10)
             if power_plugged():
                 logging.error('\t### Switch stuck on ON position!?')
-                #beep(1000, 1000)
+                beep(1000, 1000)
                 playsound('Battery_High_Alert.wav')
 
         # Turn power OFF anyway to guard if the above command failed
@@ -538,7 +537,8 @@ def main():
 
     PowerControlThread(control).start()
 
-    WatchdogThread().start()
+    if False:
+        WatchdogThread().start()
 
     if sleep_on_inactivity:
         if not IS_WINDOWS:
