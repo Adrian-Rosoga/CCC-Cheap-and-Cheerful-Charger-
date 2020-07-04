@@ -52,7 +52,6 @@ if IS_WINDOWS:
 LOG_FILE = 'ccc.log'
 TIMEOUT = 10
 
-#MIN_CHARGE, MAX_CHARGE = 25, 75
 MIN_CHARGE, MAX_CHARGE = 45, 55
 
 MIN_CHARGE_MANUAL, MAX_CHARGE_MANUAL = MIN_CHARGE - 1, MAX_CHARGE + 1
@@ -60,14 +59,11 @@ MIN_CHARGE_MANUAL, MAX_CHARGE_MANUAL = MIN_CHARGE - 1, MAX_CHARGE + 1
 MAX_ALERT_CHARGE = MAX_CHARGE + 5
 MIN_ALERT_CHARGE = MIN_CHARGE - 5
 
-# Defining static vars
-IP = "192.168.1.157" #  Checks IP is valid, change to your smart-plug IP
-PORT = 9999 #  9999 is default port. Change if need to
+IP_PORT = '192.168.1.157:9999'
 
 switch = None
 
 
-# Encrypts value to be sent
 def encrypt(string):
     key = 171
     result = pack('>I', len(string))
@@ -78,7 +74,6 @@ def encrypt(string):
     return result
 
 
-# Decrypts return value
 def decrypt(string):
     key = 171
     result = ""
@@ -89,8 +84,7 @@ def decrypt(string):
     return result
 
 
-# Basic commands
-commands = {'info'     : '{"system":{"get_sysinfo":{}}}',
+COMMANDS = {'info'     : '{"system":{"get_sysinfo":{}}}',
             'on'       : '{"system":{"set_relay_state":{"state":1}}}',
             'off'      : '{"system":{"set_relay_state":{"state":0}}}',
             'ledoff'   : '{"system":{"set_led_off":{"off":1}}}',
@@ -104,21 +98,23 @@ commands = {'info'     : '{"system":{"get_sysinfo":{}}}',
             'reboot'   : '{"system":{"reboot":{"delay":1}}}',
             'reset'    : '{"system":{"reset":{"delay":1}}}',
             'energy'   : '{"emeter":{"get_realtime":{}}}'
-}
+            }
 
-# Sends command to device
+
 def sendCommand(cmd):
+    ip, port = IP_PORT.split(':')
+    port = int(port)
     try:
         sock_tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock_tcp.settimeout(TIMEOUT)
-        sock_tcp.connect((IP, PORT))
+        sock_tcp.connect((ip, port))
         sock_tcp.settimeout(None)
         sock_tcp.send(encrypt(cmd))
         data = sock_tcp.recv(2048)
         sock_tcp.close()
         return data
     except socket.error:
-        logging.error("Could not connect to host " + IP + ":" + str(PORT))
+        logging.error(f'Connect failure to smartplug at {IP_PORT}')
 
 
 def wifi_ssid() -> str:
@@ -196,7 +192,7 @@ class HS100Switch(Switch):
 
     @property
     def state(self):
-        response = sendCommand(commands["info"])
+        response = sendCommand(COMMANDS['info'])
         if response is None:    # Because on holiday for example
             return Switch.State.NA
         info = decrypt(response)
@@ -205,10 +201,10 @@ class HS100Switch(Switch):
         return Switch.State.ON if data['system']['get_sysinfo']['relay_state'] == 1 else Switch.State.OFF
 
     def turn_on(self):
-        sendCommand(commands["on"])
+        sendCommand(COMMANDS['on'])
 
     def turn_off(self):
-        sendCommand(commands["off"])
+        sendCommand(COMMANDS['off'])
 
 
 class EnergenieSwitch(Switch):
@@ -290,13 +286,18 @@ def control(control=True):
 
             # Check power is indeed on - wait for a few secs to give the power the time to reach the computer
             time.sleep(10)
-            if not power_plugged():
-                logging.error('\t### Not charging although power turned ON')
-                # beep(1000, 1000)  # Get rid of the pesky 2 beeps
-                playsound('Battery_Low_Alert.wav')
+
+        if not power_plugged():
+            logging.error('\t### Not charging')
+            beep(1000, 1000)  # Get rid of the pesky 2 beeps
+            playsound('Battery_Low_Alert.wav')
 
         # Turn power ON anyway to guard if the above command failed
         switch.turn_on()
+
+        if switch.state == Switch.State.ON and not power_plugged():
+            logging.warning('\t### Switch is ON but still not charging!')
+            beep(1000, 1000)
 
     elif battery_level >= MAX_CHARGE:
 
@@ -308,19 +309,16 @@ def control(control=True):
             time.sleep(10)
             if power_plugged():
                 logging.error('\t### Switch stuck on ON position!?')
-                #beep(1000, 1000)
+                beep(1000, 1000)
                 playsound('Battery_High_Alert.wav')
 
         # Turn power OFF anyway to guard if the above command failed
         switch.turn_off()
 
-    if switch.state == Switch.State.OFF and power_plugged():
-        logging.warning('\t### Charging when not supposed to!?')
-        beep(1000, 1000)
-
-    if switch.state == Switch.State.ON and not power_plugged():
-        logging.warning('\t### Plug charger in or check why not charging!')
-        beep(1000, 1000)
+        if power_plugged():
+            logging.warning('\t### Charging above the threshold!')
+            beep(1000, 1000)
+            playsound('Battery_High_Alert.wav')
 
 
 def wndproc(hwnd, msg, wparam, lparam):
@@ -537,7 +535,8 @@ def main():
 
     PowerControlThread(control).start()
 
-    WatchdogThread().start()
+    if False:
+        WatchdogThread().start()
 
     if sleep_on_inactivity:
         if not IS_WINDOWS:
