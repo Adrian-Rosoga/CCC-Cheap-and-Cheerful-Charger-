@@ -52,10 +52,8 @@ if IS_WINDOWS:
 LOG_FILE = 'ccc.log'
 TIMEOUT = 10
 
-MIN_CHARGE, MAX_CHARGE = 25, 75
-#MIN_CHARGE, MAX_CHARGE = 57, 59
-#MIN_CHARGE, MAX_CHARGE = 49, 51
-#MIN_CHARGE, MAX_CHARGE = 42, 47
+#MIN_CHARGE, MAX_CHARGE = 25, 75
+MIN_CHARGE, MAX_CHARGE = 45, 55
 
 MIN_CHARGE_MANUAL, MAX_CHARGE_MANUAL = MIN_CHARGE - 1, MAX_CHARGE + 1
 
@@ -268,15 +266,16 @@ def control(control=True):
 
     battery_level = battery_percent()
 
-    # Hack for manual charging
-    if battery_level <= MIN_CHARGE_MANUAL and not power_plugged():
-        logging.info('Beep on battery_level < MIN_CHARGE_MANUAL and not power_plugged()')
-        beep(1000, 1000)
-        playsound('Battery_Low_Alert.wav')
-    elif battery_level >= MAX_CHARGE_MANUAL and power_plugged():
-        logging.info('Beep on battery_level > MAX_CHARGE_MANUAL and power_plugged()')
-        beep(2000, 3000)
-        playsound('Battery_High_Alert.wav')
+    if False:
+        # Hack for manual charging
+        if battery_level <= MIN_CHARGE_MANUAL and not power_plugged():
+            logging.info('Beep on battery_level < MIN_CHARGE_MANUAL and not power_plugged()')
+            beep(1000, 1000)
+            playsound('Battery_Low_Alert.wav')
+        elif battery_level >= MAX_CHARGE_MANUAL and power_plugged():
+            logging.info('Beep on battery_level > MAX_CHARGE_MANUAL and power_plugged()')
+            beep(2000, 3000)
+            playsound('Battery_High_Alert.wav')
 
     logging.info(f'{battery_level:.1f}% {switch.__class__.__name__} State={str(switch.state.name)} Power={bool2onoff(power_plugged())}')
 
@@ -452,7 +451,7 @@ class SleepThread(threading.Thread):
 
     def run(self):
 
-        SLEEP_AFTER_MINS = 5
+        SLEEP_AFTER_MINS = 2
         SLEEP_AFTER_SECS = SLEEP_AFTER_MINS * 60
 
         while True:
@@ -501,8 +500,8 @@ def main():
 
     global switch
 
-    #switch = EnergenieSwitch()
-    switch = HS100Switch()
+    switch = EnergenieSwitch()
+    #switch = HS100Switch()
 
     #test_on_off()
 
