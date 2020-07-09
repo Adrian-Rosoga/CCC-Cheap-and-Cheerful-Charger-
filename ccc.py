@@ -49,20 +49,19 @@ if IS_WINDOWS:
     from winerror import ERROR_ALREADY_EXISTS
 
 
+
 LOG_FILE = 'ccc.log'
 TIMEOUT = 10
 
 MIN_CHARGE, MAX_CHARGE = 45, 55
-
 MIN_CHARGE_MANUAL, MAX_CHARGE_MANUAL = MIN_CHARGE - 1, MAX_CHARGE + 1
-
 MAX_ALERT_CHARGE = MAX_CHARGE + 5
 MIN_ALERT_CHARGE = MIN_CHARGE - 5
 
 IP_PORT = '192.168.1.157:9999'
 
 switch = None
-
+beep_only = False
 
 def encrypt(string):
     key = 171
@@ -132,8 +131,12 @@ def wifi_ssid() -> str:
 
 def should_be_quiet() -> bool:
     """At work keep it quiet"""
-
     return 'Barclays' in wifi_ssid()
+
+
+def voice_alert(soundfile):
+    if not beep_only:
+        playsound(soundfile)
 
 
 def beep(frequency=2500, duration_msec=1000):
@@ -144,7 +147,7 @@ def beep(frequency=2500, duration_msec=1000):
     if IS_WINDOWS:
         winsound.Beep(frequency, duration_msec)
     else:
-        playsound('beep-low-freq.wav')
+        voice_alert('beep-low-freq.wav')
 
 
 class Switch(ABC):
@@ -267,13 +270,13 @@ def control(control=True):
         if battery_level <= MIN_CHARGE_MANUAL and not power_plugged():
             logging.info('Beep on battery_level < MIN_CHARGE_MANUAL and not power_plugged()')
             beep(1000, 1000)
-            playsound('Battery_Low_Alert.wav')
+            voice_alert('Battery_Low_Alert.wav')
         elif battery_level >= MAX_CHARGE_MANUAL and power_plugged():
             logging.info('Beep on battery_level > MAX_CHARGE_MANUAL and power_plugged()')
             beep(2000, 3000)
-            playsound('Battery_High_Alert.wav')
+            voice_alert('Battery_High_Alert.wav')
 
-    logging.info(f'{battery_level:.1f}% {switch.__class__.__name__} State={str(switch.state.name)} Power={bool2onoff(power_plugged())}')
+    logging.info(f'{battery_level:.1f}% {switch.__class__.__name__} State={str(switch.state.name)} Charging={bool2onoff(power_plugged())}')
 
     if not control:
         return
@@ -290,7 +293,7 @@ def control(control=True):
         if not power_plugged():
             logging.error('\t### Not charging')
             beep(1000, 1000)  # Get rid of the pesky 2 beeps
-            playsound('Battery_Low_Alert.wav')
+            voice_alert('Battery_Low_Alert.wav')
 
         # Turn power ON anyway to guard if the above command failed
         switch.turn_on()
@@ -310,7 +313,7 @@ def control(control=True):
             if power_plugged():
                 logging.error('\t### Switch stuck on ON position!?')
                 beep(1000, 1000)
-                playsound('Battery_High_Alert.wav')
+                voice_alert('Battery_High_Alert.wav')
 
         # Turn power OFF anyway to guard if the above command failed
         switch.turn_off()
@@ -318,7 +321,7 @@ def control(control=True):
         if power_plugged():
             logging.warning('\t### Charging above the threshold!')
             beep(1000, 1000)
-            playsound('Battery_High_Alert.wav')
+            voice_alert('Battery_High_Alert.wav')
 
 
 def wndproc(hwnd, msg, wparam, lparam):
@@ -494,18 +497,20 @@ def main():
     parser = argparse.ArgumentParser(description='CCC (Cheap and Cheerful Charger)')
     parser.add_argument('--nocontrol', help='no power control, just monitor', action='store_true')
     parser.add_argument('--inactivity', help='make computer sleep on inactivity', action='store_true')
+    parser.add_argument('--beep', help='beep only', action='store_true')
     args = parser.parse_args()
 
     global switch
+    global beep_only
 
-    switch = EnergenieSwitch()
-    #switch = HS100Switch()
+    #switch = EnergenieSwitch()
+    switch = HS100Switch()
 
     #test_on_off()
 
     sleep_on_inactivity = args.inactivity
-
     control = not args.nocontrol
+    beep_only = args.beep
 
     logging.info('*****************************************************')
     logging.info('*****************************************************')
