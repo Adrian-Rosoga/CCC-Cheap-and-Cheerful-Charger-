@@ -28,13 +28,14 @@ import traceback
 import platform
 from socket import timeout
 from urllib.error import URLError, HTTPError
-from abc import ABC, abstractmethod
 import psutil
 from playsound import playsound
-from enum import Enum, unique, auto
 import socket
 from struct import pack
 import parser
+from switch_plugins.no_switch import NoSwitch
+from switch_plugins.hs100_switch import HS100Switch
+from switch_plugins.energenie_switch import EnergenieSwitch
 
 
 IS_WINDOWS = platform.system() == 'Windows'
@@ -62,58 +63,6 @@ IP_PORT = '192.168.1.157:9999'
 
 switch = None
 beep_only = False
-
-def encrypt(string):
-    key = 171
-    result = pack('>I', len(string))
-    for i in string:
-        a = key ^ ord(i)
-        key = a
-        result += bytes([a])
-    return result
-
-
-def decrypt(string):
-    key = 171
-    result = ""
-    for i in string:
-        a = key ^ i
-        key = i
-        result += chr(a)
-    return result
-
-
-COMMANDS = {'info'     : '{"system":{"get_sysinfo":{}}}',
-            'on'       : '{"system":{"set_relay_state":{"state":1}}}',
-            'off'      : '{"system":{"set_relay_state":{"state":0}}}',
-            'ledoff'   : '{"system":{"set_led_off":{"off":1}}}',
-            'ledon'    : '{"system":{"set_led_off":{"off":0}}}',
-            'cloudinfo': '{"cnCloud":{"get_info":{}}}',
-            'wlanscan' : '{"netif":{"get_scaninfo":{"refresh":0}}}',
-            'time'     : '{"time":{"get_time":{}}}',
-            'schedule' : '{"schedule":{"get_rules":{}}}',
-            'countdown': '{"count_down":{"get_rules":{}}}',
-            'antitheft': '{"anti_theft":{"get_rules":{}}}',
-            'reboot'   : '{"system":{"reboot":{"delay":1}}}',
-            'reset'    : '{"system":{"reset":{"delay":1}}}',
-            'energy'   : '{"emeter":{"get_realtime":{}}}'
-            }
-
-
-def sendCommand(cmd):
-    ip, port = IP_PORT.split(':')
-    port = int(port)
-    try:
-        sock_tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock_tcp.settimeout(TIMEOUT)
-        sock_tcp.connect((ip, port))
-        sock_tcp.settimeout(None)
-        sock_tcp.send(encrypt(cmd))
-        data = sock_tcp.recv(2048)
-        sock_tcp.close()
-        return data
-    except socket.error:
-        logging.error(f'Connect failure to smartplug at {IP_PORT}')
 
 
 def wifi_ssid() -> str:
@@ -148,96 +97,6 @@ def beep(frequency=2500, duration_msec=1000):
         winsound.Beep(frequency, duration_msec)
     else:
         playsound('beep-low-freq.wav')
-
-
-class Switch(ABC):
-
-    @unique
-    class State(Enum):
-        ON = auto()
-        OFF = auto()
-        NA = auto()
-
-    @property
-    @abstractmethod
-    def state(self):
-        pass
-
-    @abstractmethod
-    def turn_on(self):
-        pass
-
-    @abstractmethod
-    def turn_off(self):
-        pass
-
-
-class HIDSwitch(Switch):
-
-    @property
-    def state(self):
-        output = subprocess.check_output(['hidusb-Switch-cmd.exe', 'state'])
-        if 'R1=ON' in output.decode():
-            return Switch.State.ON
-        elif 'R1=OFF' in output.decode():
-            return Switch.State.OFF
-        else:
-            return Switch.State.NA
-
-    def turn_on(self):
-        os.system('hidusb-relay-cmd.exe on 1')
-
-    def turn_off(self):
-        os.system('hidusb-relay-cmd.exe off 1')
-
-
-class HS100Switch(Switch):
-
-    @property
-    def state(self):
-        response = sendCommand(COMMANDS['info'])
-        if response is None:    # Because on holiday for example
-            return Switch.State.NA
-        info = decrypt(response)
-        info = '{' + info[5:]
-        data = json.loads(info)
-        return Switch.State.ON if data['system']['get_sysinfo']['relay_state'] == 1 else Switch.State.OFF
-
-    def turn_on(self):
-        sendCommand(COMMANDS['on'])
-
-    def turn_off(self):
-        sendCommand(COMMANDS['off'])
-
-
-class EnergenieSwitch(Switch):
-
-    @property
-    def state(self):
-        return Switch.State.NA
-
-    def turn_on(self):
-        urllib.request.urlopen("http://192.168.1.108:8000/on", timeout=TIMEOUT)
-
-    def turn_off(self):
-        urllib.request.urlopen("http://192.168.1.108:8000/off", timeout=TIMEOUT)
-
-
-class NoSwitch(Switch):
-
-    @property
-    def state(self):
-        return Switch.State.NA
-
-    def turn_on(self):
-        pass
-
-    def turn_off(self):
-        pass
-
-
-def power_plugged():
-    return psutil.sensors_battery().power_plugged
 
 
 def turn_power_off():
@@ -485,9 +344,17 @@ def test_on_off():
         time.sleep(30)
 
 
+def has_battery():
+    return psutil.sensors_battery() is not None
+
+
 def main():
 
     print('\n=== Cheap and Cheerful Charger ===\n')
+
+    if not has_battery():
+        print('No battery detected. This program won\'t be of any help. Exiting.')
+        return 1
 
     logging.basicConfig(format="%(asctime)-15s - %(message)s",
                         datefmt='%Y-%m-%d %H:%M:%S',
@@ -502,8 +369,9 @@ def main():
     global switch
     global beep_only
 
+    switch = NoSwitch()
     #switch = EnergenieSwitch()
-    switch = HS100Switch()
+    #switch = HS100Switch()
 
     #test_on_off()
 
