@@ -147,7 +147,7 @@ def beep(frequency=2500, duration_msec=1000):
     if IS_WINDOWS:
         winsound.Beep(frequency, duration_msec)
     else:
-        voice_alert('beep-low-freq.wav')
+        playsound('beep-low-freq.wav')
 
 
 class Switch(ABC):
@@ -300,7 +300,6 @@ def control(control=True):
 
         if switch.state == Switch.State.ON and not power_plugged():
             logging.warning('\t### Switch is ON but still not charging!')
-            beep(1000, 1000)
 
     elif battery_level >= MAX_CHARGE:
 
