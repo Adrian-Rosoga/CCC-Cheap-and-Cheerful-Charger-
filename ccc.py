@@ -310,7 +310,7 @@ class SleepThread(threading.Thread):
 
         while True:
 
-            output = subprocess.check_output(['xprintidle'])
+            output = subprocess.check_output(['./xprintidle'])
             inactivity_secs = int(output.decode()) // 1000
 
             if inactivity_secs >= SLEEP_AFTER_SECS:
@@ -356,6 +356,7 @@ def main():
                         level=logging.INFO)
 
     parser = argparse.ArgumentParser(description='CCC (Cheap and Cheerful Charger)')
+    parser.add_argument("switch", help="type of switch")
     parser.add_argument('--nocontrol', help='no power control, just monitor', action='store_true')
     parser.add_argument('--inactivity', help='make computer sleep on inactivity', action='store_true')
     parser.add_argument('--beep', help='beep only', action='store_true')
@@ -364,9 +365,15 @@ def main():
     global switch
     global beep_only
 
-    #switch = NoSwitch()
-    #switch = EnergenieSwitch()
-    switch = HS100Switch()
+    if args.switch == 'noswitch':
+        switch = NoSwitch()
+    elif args.switch == 'energenie':
+        switch = EnergenieSwitch()
+    elif args.switch == 'hs100':
+        switch = HS100Switch()
+    else:
+        print('Invalid switch value. Exiting.')
+        return 1
 
     #test_on_off()
 
