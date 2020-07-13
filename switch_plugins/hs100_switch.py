@@ -1,5 +1,11 @@
-
+import json
+import socket
+import logging
+from struct import pack
 from switch_plugins.switch import Switch
+
+IP_PORT = '192.168.1.157:9999'
+TIMEOUT = 10
 
 
 def encrypt(string):

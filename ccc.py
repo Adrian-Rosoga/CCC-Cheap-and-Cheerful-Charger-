@@ -12,27 +12,24 @@ TODO
     # requests instead of urllib
 '''
 
-
 import time
 import os
 import subprocess
 import sys
 import threading
 import urllib.request
-import json
 import atexit
 import signal
 import logging
 import argparse
 import traceback
 import platform
-from socket import timeout
 from urllib.error import URLError, HTTPError
 import psutil
 from playsound import playsound
 import socket
-from struct import pack
 import parser
+from switch_plugins.switch import Switch
 from switch_plugins.no_switch import NoSwitch
 from switch_plugins.hs100_switch import HS100Switch
 from switch_plugins.energenie_switch import EnergenieSwitch
@@ -50,16 +47,12 @@ if IS_WINDOWS:
     from winerror import ERROR_ALREADY_EXISTS
 
 
-
 LOG_FILE = 'ccc.log'
-TIMEOUT = 10
 
 MIN_CHARGE, MAX_CHARGE = 45, 55
 MIN_CHARGE_MANUAL, MAX_CHARGE_MANUAL = MIN_CHARGE - 1, MAX_CHARGE + 1
 MAX_ALERT_CHARGE = MAX_CHARGE + 5
 MIN_ALERT_CHARGE = MIN_CHARGE - 5
-
-IP_PORT = '192.168.1.157:9999'
 
 switch = None
 beep_only = False
@@ -73,9 +66,7 @@ def wifi_ssid() -> str:
     else:
         cmd_list = ['iwgetid', '-r']
 
-    output = subprocess.check_output(cmd_list)
-
-    return output.decode()
+    return subprocess.check_output(cmd_list).decode()
 
 
 def should_be_quiet() -> bool:
@@ -97,6 +88,10 @@ def beep(frequency=2500, duration_msec=1000):
         winsound.Beep(frequency, duration_msec)
     else:
         playsound('beep-low-freq.wav')
+
+
+def power_plugged():
+    return psutil.sensors_battery().power_plugged
 
 
 def turn_power_off():
@@ -369,9 +364,9 @@ def main():
     global switch
     global beep_only
 
-    switch = NoSwitch()
+    #switch = NoSwitch()
     #switch = EnergenieSwitch()
-    #switch = HS100Switch()
+    switch = HS100Switch()
 
     #test_on_off()
 
