@@ -49,6 +49,8 @@ if IS_WINDOWS:
 
 LOG_FILE = 'ccc.log'
 
+SLEEP_AFTER_INACTIVITY_MINS = 4
+
 MIN_CHARGE, MAX_CHARGE = 45, 55
 MIN_CHARGE_MANUAL, MAX_CHARGE_MANUAL = MIN_CHARGE - 1, MAX_CHARGE + 1
 MAX_ALERT_CHARGE = MAX_CHARGE + 5
@@ -171,11 +173,6 @@ def control(control=True):
         # Turn power OFF anyway to guard if the above command failed
         switch.turn_off()
 
-        if power_plugged():
-            logging.warning('\t### Charging above the threshold!')
-            beep(1000, 1000)
-            voice_alert('Battery_High_Alert.wav')
-
 
 def wndproc(hwnd, msg, wparam, lparam):
     '''
@@ -249,8 +246,8 @@ class PowerControlThread(threading.Thread):
             except URLError as e:
                 logging.error('URLError: We failed to reach a server')
                 logging.error('\tReason: ' + str(e.reason))
-            except timeout:
-                logging.error('timeout: socket timed out')
+            except socket.timeout:
+                logging.error('socket.timeout: Socket timed out')
             except Exception as ex:
                 logging.error('Exception: ' + ex.__class__.__name__)
                 logging.error(ex)
@@ -305,15 +302,12 @@ class SleepThread(threading.Thread):
 
     def run(self):
 
-        SLEEP_AFTER_MINS = 2
-        SLEEP_AFTER_SECS = SLEEP_AFTER_MINS * 60
-
         while True:
 
             output = subprocess.check_output(['./xprintidle'])
             inactivity_secs = int(output.decode()) // 1000
 
-            if inactivity_secs >= SLEEP_AFTER_SECS:
+            if inactivity_secs >= SLEEP_AFTER_INACTIVITY_MINS * 60:
                 logging.info(f'No user activity in the last {inactivity_secs} seconds. Turning power off and going to sleep...')
 
                 try:
@@ -322,12 +316,17 @@ class SleepThread(threading.Thread):
                     logging.error('Exception thrown when turning the switch off')
                 
                 time.sleep(5)
-                os.system('systemctl suspend')
+                
+                # Suspend only if power is indeed disconnected, else keep it awake to at least alert in case
+                # it would overcharge
+                if not power_plugged():
+                    os.system('systemctl suspend')
 
             else:
                 logging.info(f'User activity detected {inactivity_secs} secs ago. Staying awake!')
 
-            time.sleep(SLEEP_AFTER_SECS + 10)
+            # Sleep a few secs longer than the inactivity interval
+            time.sleep(SLEEP_AFTER_INACTIVITY_MINS * 60 + 10)
 
 
 def test_on_off():
