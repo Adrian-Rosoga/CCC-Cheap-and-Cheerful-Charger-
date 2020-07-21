@@ -18,13 +18,13 @@ import subprocess
 import sys
 import threading
 import urllib.request
+from urllib.error import URLError, HTTPError
 import atexit
 import signal
 import logging
 import argparse
 import traceback
 import platform
-from urllib.error import URLError, HTTPError
 import psutil
 from playsound import playsound
 import socket
@@ -53,6 +53,8 @@ MIN_CHARGE, MAX_CHARGE = 45, 55
 MIN_CHARGE_MANUAL, MAX_CHARGE_MANUAL = MIN_CHARGE - 1, MAX_CHARGE + 1
 MAX_ALERT_CHARGE = MAX_CHARGE + 5
 MIN_ALERT_CHARGE = MIN_CHARGE - 5
+
+TIMEOUT = 10
 
 switch = None
 beep_only = False
@@ -305,7 +307,7 @@ class SleepThread(threading.Thread):
 
     def run(self):
 
-        SLEEP_AFTER_MINS = 2
+        SLEEP_AFTER_MINS = 4
         SLEEP_AFTER_SECS = SLEEP_AFTER_MINS * 60
 
         while True:
@@ -351,9 +353,12 @@ def main():
         print('No battery detected. This program won\'t be of any help. Exiting.')
         return 1
 
+    handlers = [logging.FileHandler(LOG_FILE), logging.StreamHandler()]
+
     logging.basicConfig(format="%(asctime)-15s - %(message)s",
                         datefmt='%Y-%m-%d %H:%M:%S',
-                        level=logging.INFO)
+                        level=logging.INFO,
+                        handlers=handlers)
 
     parser = argparse.ArgumentParser(description='CCC (Cheap and Cheerful Charger)')
     parser.add_argument("switch", help="type of switch")
@@ -368,7 +373,7 @@ def main():
     if args.switch == 'noswitch':
         switch = NoSwitch()
     elif args.switch == 'energenie':
-        switch = EnergenieSwitch()
+        switch = EnergenieSwitch(TIMEOUT)
     elif args.switch == 'hs100':
         switch = HS100Switch()
     else:
