@@ -66,7 +66,7 @@ class HS100Switch(Switch):
     @property
     def state(self):
         response = sendCommand(COMMANDS['info'])
-        if response is None:    # Because on holiday for example
+        if response is None:
             return Switch.State.NA
         info = decrypt(response)
         info = '{' + info[5:]
