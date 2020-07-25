@@ -26,6 +26,7 @@ import argparse
 import traceback
 import platform
 import psutil
+from pathlib import Path
 from playsound import playsound
 import socket
 import parser
@@ -351,8 +352,10 @@ def main():
     if not has_battery():
         print('No battery detected. This program won\'t be of any help. Exiting.')
         return 1
+  
+    log_file = Path.home() / LOG_FILE
 
-    handlers = [logging.FileHandler(LOG_FILE), logging.StreamHandler()]
+    handlers = [logging.FileHandler(log_file), logging.StreamHandler()]
 
     logging.basicConfig(format="%(asctime)-15s - %(message)s",
                         datefmt='%Y-%m-%d %H:%M:%S',
@@ -397,7 +400,10 @@ def main():
         min_level = MIN_CHARGE
         max_level = MAX_CHARGE
 
+    logging.info('*** Cheap and Cheerful Charger ***')
+    logging.info(f'Arguments: {" ".join(sys.argv[1:])}')
     logging.info(f'Charge range is ({min_level}% - {max_level}%)')
+    logging.info(f'Logging to: {log_file}')
 
     logging.info('*****************************************************')
     logging.info('*****************************************************')
