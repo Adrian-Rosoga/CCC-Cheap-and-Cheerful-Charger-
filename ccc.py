@@ -30,6 +30,8 @@ from pathlib import Path
 from playsound import playsound
 import socket
 import parser
+from datetime import datetime
+import datetime
 from switch_plugins.switch import Switch
 from switch_plugins.no_switch import NoSwitch
 from switch_plugins.hs100_switch import HS100Switch
@@ -58,6 +60,8 @@ MAX_ALERT_CHARGE = MAX_CHARGE + 5
 MIN_ALERT_CHARGE = MIN_CHARGE - 5
 
 TIMEOUT = 10
+START_QUIET_TIME = datetime.time(20, 0)
+END_QUIET_TIME = datetime.time(6, 45)
 
 switch = None
 beep_only = False
@@ -79,8 +83,17 @@ def should_be_quiet() -> bool:
     return 'Barclays' in wifi_ssid()
 
 
+def is_time_between(begin_time, end_time, check_time=None):
+    # If check time is not given, default to current UTC time
+    check_time = check_time or datetime.datetime.now().time()
+    if begin_time < end_time:
+        return check_time >= begin_time and check_time <= end_time
+    else: # crosses midnight
+        return check_time >= begin_time or check_time <= end_time
+
+
 def voice_alert(soundfile):
-    if not beep_only:
+    if not beep_only and not is_time_between(START_QUIET_TIME, END_QUIET_TIME):
         playsound(soundfile)
 
 
