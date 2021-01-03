@@ -1,2 +1,6 @@
-.mypy_cache
+ccc.log
 __pycache__
+/build
+/dist
+*.spec
+

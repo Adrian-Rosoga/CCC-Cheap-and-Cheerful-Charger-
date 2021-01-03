@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-'''
+"""
 
 v1 - 26 Jan 2018
     # Support for TP-Link HS100 charger
@@ -10,7 +10,7 @@ v2 - 31 Dec 2019
 TODO
     # Ensure only one instance could run
     # requests instead of urllib
-'''
+"""
 
 import time
 import os
@@ -18,17 +18,20 @@ import subprocess
 import sys
 import threading
 import urllib.request
+from urllib.error import URLError, HTTPError
 import atexit
 import signal
 import logging
 import argparse
 import traceback
 import platform
-from urllib.error import URLError, HTTPError
 import psutil
+from pathlib import Path
 from playsound import playsound
 import socket
 import parser
+from datetime import datetime
+import datetime
 from switch_plugins.switch import Switch
 from switch_plugins.no_switch import NoSwitch
 from switch_plugins.hs100_switch import HS100Switch
@@ -53,8 +56,12 @@ SLEEP_AFTER_INACTIVITY_MINS = 4
 
 MIN_CHARGE, MAX_CHARGE = 45, 55
 MIN_CHARGE_MANUAL, MAX_CHARGE_MANUAL = MIN_CHARGE - 1, MAX_CHARGE + 1
-MAX_ALERT_CHARGE = MAX_CHARGE + 5
-MIN_ALERT_CHARGE = MIN_CHARGE - 5
+MAX_ALERT_CHARGE = 80
+MIN_ALERT_CHARGE = 20
+
+TIMEOUT = 10
+START_QUIET_TIME = datetime.time(20, 0)
+END_QUIET_TIME = datetime.time(6, 45)
 
 switch = None
 beep_only = False
@@ -76,8 +83,16 @@ def should_be_quiet() -> bool:
     return 'Barclays' in wifi_ssid()
 
 
+def is_time_between(begin_time, end_time, check_time=None):
+    check_time = check_time or datetime.datetime.now().time()
+    if begin_time < end_time:
+        return begin_time <= check_time <= end_time
+    else:
+        return check_time >= begin_time or check_time <= end_time
+
+
 def voice_alert(soundfile):
-    if not beep_only:
+    if not beep_only and not is_time_between(START_QUIET_TIME, END_QUIET_TIME):
         playsound(soundfile)
 
 
@@ -90,6 +105,17 @@ def beep(frequency=2500, duration_msec=1000):
         winsound.Beep(frequency, duration_msec)
     else:
         playsound('beep-low-freq.wav')
+
+
+def beep_loud(frequency=2500, duration_msec=3000):
+
+    if should_be_quiet():
+        return
+
+    if IS_WINDOWS:
+        winsound.Beep(frequency, duration_msec)
+    else:
+        playsound('beep-loud.wav')
 
 
 def power_plugged():
@@ -148,7 +174,7 @@ def control(control=True):
 
         if not power_plugged():
             logging.error('\t### Not charging')
-            beep(1000, 1000)  # Get rid of the pesky 2 beeps
+            beep(1000, 1000)
             voice_alert('Battery_Low_Alert.wav')
 
         # Turn power ON anyway to guard if the above command failed
@@ -167,7 +193,7 @@ def control(control=True):
             time.sleep(10)
             if power_plugged():
                 logging.error('\t### Switch stuck on ON position!?')
-                beep(1000, 1000)
+                beep(1000, 3000)
                 voice_alert('Battery_High_Alert.wav')
 
         # Turn power OFF anyway to guard if the above command failed
@@ -218,10 +244,10 @@ def listen_for_sleep():
                                        0,
                                        hinst,
                                        None)
+        logging.info(f'hwnd={hwnd}')
     except Exception as e:
         logging.error(f'Exception caught: {str(e)}')
-
-    logging.info(f'hwnd={hwnd}')
+        return
 
     while True:
         win32gui.PumpWaitingMessages()
@@ -264,17 +290,17 @@ class WatchdogThread(threading.Thread):
 
             battery_level = battery_percent()
             if battery_level >= MAX_ALERT_CHARGE:
-                logging.info(f'\t### Overcharged above {MAX_ALERT_CHARGE:.1f}% - {battery_level:.1f}%')
+                logging.info(f'\t### Overcharged above {MAX_ALERT_CHARGE:.1f}% - at {battery_level:.1f}%')
                 if power_plugged():
-                    beep(500, 3000)
+                    beep_loud(500, 3000)
                     time.sleep(0.1)
-                    beep(500, 3000)
+                    beep_loud(500, 3000)
                     time.sleep(0.1)
-                    beep(500, 3000)
+                    beep_loud(500, 3000)
             elif battery_level <= MIN_ALERT_CHARGE:
-                logging.info(f'\t### Undercharged below {MIN_ALERT_CHARGE:.1f}% - {battery_level:.1f}%')
+                logging.info(f'\t### Undercharged below {MIN_ALERT_CHARGE:.1f}% - at {battery_level:.1f}%')
                 if not power_plugged():
-                    beep(500, 3000)
+                    beep_loud(500, 3000)
 
             time.sleep(60)
 
@@ -349,10 +375,15 @@ def main():
     if not has_battery():
         print('No battery detected. This program won\'t be of any help. Exiting.')
         return 1
+  
+    log_file = Path.home() / LOG_FILE
+
+    handlers = [logging.FileHandler(log_file), logging.StreamHandler()]
 
     logging.basicConfig(format="%(asctime)-15s - %(message)s",
                         datefmt='%Y-%m-%d %H:%M:%S',
-                        level=logging.INFO)
+                        level=logging.INFO,
+                        handlers=handlers)
 
     parser = argparse.ArgumentParser(description='CCC (Cheap and Cheerful Charger)')
     parser.add_argument("switch", help="type of switch: hs100, energenie, noswitch")
@@ -367,7 +398,7 @@ def main():
     if args.switch == 'noswitch':
         switch = NoSwitch()
     elif args.switch == 'energenie':
-        switch = EnergenieSwitch()
+        switch = EnergenieSwitch(TIMEOUT)
     elif args.switch == 'hs100':
         switch = HS100Switch()
     else:
@@ -392,14 +423,17 @@ def main():
         min_level = MIN_CHARGE
         max_level = MAX_CHARGE
 
+    logging.info('*** Cheap and Cheerful Charger ***')
+    logging.info(f'Arguments: {" ".join(sys.argv[1:])}')
     logging.info(f'Charge range is ({min_level}% - {max_level}%)')
+    logging.info(f'Logging to: {log_file}')
 
     logging.info('*****************************************************')
     logging.info('*****************************************************')
 
     sys.stderr = sys.stdout
 
-    # To prevent overcharging tunr power off when killing the program
+    # To prevent overcharging turn power off when killing the program
     if not IS_WINDOWS:
         atexit.register(turn_power_off)
         signal.signal(signal.SIGUSR1, handler)
@@ -408,8 +442,7 @@ def main():
 
     PowerControlThread(control).start()
 
-    if False:
-        WatchdogThread().start()
+    WatchdogThread().start()
 
     if sleep_on_inactivity:
         if not IS_WINDOWS:
