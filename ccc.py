@@ -355,7 +355,7 @@ def main():
                         level=logging.INFO)
 
     parser = argparse.ArgumentParser(description='CCC (Cheap and Cheerful Charger)')
-    parser.add_argument("switch", help="type of switch")
+    parser.add_argument("switch", help="type of switch: hs100, energenie, noswitch")
     parser.add_argument('--nocontrol', help='no power control, just monitor', action='store_true')
     parser.add_argument('--inactivity', help='make computer sleep on inactivity', action='store_true')
     parser.add_argument('--beep', help='beep only', action='store_true')
