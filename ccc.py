@@ -29,7 +29,6 @@ import psutil
 from pathlib import Path
 from playsound import playsound
 import socket
-import parser
 from datetime import datetime
 import datetime
 from switch_plugins.switch import Switch
