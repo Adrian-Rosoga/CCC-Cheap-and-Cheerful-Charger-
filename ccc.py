@@ -386,6 +386,8 @@ def main():
 
     parser = argparse.ArgumentParser(description='CCC (Cheap and Cheerful Charger)')
     parser.add_argument("switch", help="type of switch: hs100, energenie, noswitch")
+    parser.add_argument("--min", help="minimum charge for alert")
+    parser.add_argument("--max", help="maximum charge for alert")
     parser.add_argument('--nocontrol', help='no power control, just monitor', action='store_true')
     parser.add_argument('--inactivity', help='make computer sleep on inactivity', action='store_true')
     parser.add_argument('--beep', help='beep only', action='store_true')
@@ -421,6 +423,9 @@ def main():
     else:
         min_level = MIN_CHARGE
         max_level = MAX_CHARGE
+
+    min_level = int(args.min) if args.min else min_level
+    max_level = int(args.max) if args.max else max_level
 
     logging.info('*** Cheap and Cheerful Charger ***')
     logging.info(f'Arguments: {" ".join(sys.argv[1:])}')
