@@ -57,6 +57,8 @@ MIN_CHARGE, MAX_CHARGE = 45, 55
 MIN_CHARGE_MANUAL, MAX_CHARGE_MANUAL = MIN_CHARGE - 1, MAX_CHARGE + 1
 MAX_ALERT_CHARGE = 80
 MIN_ALERT_CHARGE = 20
+min_level = None
+max_level = None
 
 TIMEOUT = 10
 START_QUIET_TIME = datetime.time(20, 0)
@@ -162,7 +164,7 @@ def control(control=True):
     if not control:
         return
 
-    if battery_level <= MIN_CHARGE:
+    if battery_level <= min_level:
 
         if switch.state == Switch.State.OFF or switch.state == Switch.State.NA:
             switch.turn_on()
@@ -182,7 +184,7 @@ def control(control=True):
         if switch.state == Switch.State.ON and not power_plugged():
             logging.warning('\t### Switch is ON but still not charging!')
 
-    elif battery_level >= MAX_CHARGE:
+    elif battery_level >= max_level:
 
         if switch.state != Switch.State.OFF or switch.state == Switch.State.NA:
             switch.turn_off()
@@ -317,6 +319,7 @@ class SingleInstanceThread(threading.Thread):
 
             if last_error == ERROR_ALREADY_EXISTS:
                 logging.info('Another instance already running. Exiting.')
+                beep_loud()
                 os._exit(1)
 
             while True:
@@ -369,8 +372,6 @@ def has_battery():
 
 def main():
 
-    print('\n=== Cheap and Cheerful Charger ===\n')
-
     if not has_battery():
         print('No battery detected. This program won\'t be of any help. Exiting.')
         return 1
@@ -395,6 +396,8 @@ def main():
 
     global switch
     global beep_only
+    global min_level, max_level
+    global MAX_ALERT_CHARGE, MIN_ALERT_CHARGE
 
     if args.switch == 'noswitch':
         switch = NoSwitch()
@@ -412,28 +415,31 @@ def main():
     control = not args.nocontrol
     beep_only = args.beep
 
-    logging.info('*****************************************************')
-    logging.info('*****************************************************')
+    print('')
 
     if not control:
         switch = NoSwitch()
-        logging.info('Monitoring mode, power source not controlled')
+        print('Monitoring mode, power source not controlled')
         min_level = MIN_CHARGE_MANUAL
         max_level = MAX_CHARGE_MANUAL
     else:
         min_level = MIN_CHARGE
         max_level = MAX_CHARGE
 
-    min_level = int(args.min) if args.min else min_level
-    max_level = int(args.max) if args.max else max_level
+    if args.min is not None:
+        min_level = int(args.min)
+        MIN_ALERT_CHARGE = min_level
+    if args.max is not None:
+        max_level = int(args.max)
+        MAX_ALERT_CHARGE = max_level
 
-    logging.info('*** Cheap and Cheerful Charger ***')
-    logging.info(f'Arguments: {" ".join(sys.argv[1:])}')
-    logging.info(f'Charge range is ({min_level}% - {max_level}%)')
-    logging.info(f'Logging to: {log_file}')
+    print('************* Cheap and Cheerful Charger *************')
+    print(f'Arguments: {" ".join(sys.argv[1:])}')
+    print(f'Charge range: ({min_level}% - {max_level}%)')
+    print(f'Logging to: {log_file}')
 
-    logging.info('*****************************************************')
-    logging.info('*****************************************************')
+    print('******************************************************')
+    print('')
 
     sys.stderr = sys.stdout
 
